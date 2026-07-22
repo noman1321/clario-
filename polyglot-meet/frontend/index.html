@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clario — Speak Any Language, Understand Everyone</title>
+  <meta name="description" content="Real-time AI translation and captions during video calls. Break language barriers instantly across 10+ languages." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script>if(localStorage.getItem('pm-theme')==='light')document.documentElement.classList.add('light');</script>
+
+  <style>
+  /* ── Language Rotator ─────────────────────────────── */
+  .lang-rotator {
+    display:inline-flex;align-items:center;gap:0.6rem;
+    margin-bottom:1.6rem;
+    font-size:1.05rem;font-weight:500;color:var(--text-mid);
+  }
+  .rotator-label { color:var(--text-dim);font-size:0.9rem; }
+  .rotator-word-wrap {
+    position:relative;height:1.6em;width:160px;overflow:hidden;
+    display:inline-flex;align-items:center;
+  }
+  .rotator-word {
+    position:absolute;left:0;
+    font-size:1.3rem;font-weight:800;
+    background:linear-gradient(120deg,var(--violet-3),var(--cyan));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    opacity:0;transform:translateY(100%);
+    transition:opacity 0.4s ease,transform 0.4s ease;
+    white-space:nowrap;
+  }
+  .rotator-word.active  { opacity:1;transform:translateY(0); }
+  .rotator-word.leaving { opacity:0;transform:translateY(-100%); }
+  html.light .rotator-word {
+    background:linear-gradient(120deg,var(--violet),var(--indigo));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+
+  /* ── Animated waveform in hero ────────────────────── */
+  .hero-wave {
+    display:flex;align-items:center;justify-content:center;gap:3px;
+    margin:2rem auto 0;height:36px;
+  }
+  .hero-wave .bar {
+    width:3px;border-radius:3px;
+    background:linear-gradient(to top,var(--violet),var(--cyan));
+    animation:waveBar 1.4s ease-in-out infinite;
+    opacity:0.7;
+  }
+  .hero-wave .bar:nth-child(1){height:12px;animation-delay:0s}
+  .hero-wave .bar:nth-child(2){height:24px;animation-delay:0.1s}
+  .hero-wave .bar:nth-child(3){height:36px;animation-delay:0.2s}
+  .hero-wave .bar:nth-child(4){height:28px;animation-delay:0.3s}
+  .hero-wave .bar:nth-child(5){height:20px;animation-delay:0.4s}
+  .hero-wave .bar:nth-child(6){height:32px;animation-delay:0.15s}
+  .hero-wave .bar:nth-child(7){height:18px;animation-delay:0.25s}
+  .hero-wave .bar:nth-child(8){height:26px;animation-delay:0.35s}
+  .hero-wave .bar:nth-child(9){height:14px;animation-delay:0.05s}
+  @keyframes waveBar {
+    0%,100%{transform:scaleY(0.4)}
+    50%{transform:scaleY(1)}
+  }
+
+  /* ── Demo Section ─────────────────────────────────── */
+  .demo-section {
+    padding:6rem 2rem;
+    background:#000;
+    overflow:hidden;
+  }
+  html.light .demo-section { background:#f2f2f7; }
+  .demo-inner {
+    max-width:1000px;margin:0 auto;text-align:center;
+  }
+  .demo-mock {
+    margin-top:3rem;border-radius:20px;overflow:hidden;
+    border:1px solid var(--border-2);
+    background:var(--surface);
+    box-shadow:0 24px 80px rgba(0,0,0,0.35);
+  }
+  html.light .demo-mock {
+    box-shadow:0 24px 80px rgba(0,0,0,0.1);
+  }
+  .demo-topbar {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0.75rem 1.25rem;
+    background:var(--surface-2);border-bottom:1px solid var(--border);
+  }
+  .demo-topbar-logo { display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.85rem;color:var(--text); }
+  .demo-topbar-logo img { width:22px;height:22px;border-radius:5px; }
+  .demo-topbar-tags { display:flex;gap:0.5rem; }
+  .demo-tag {
+    font-size:0.65rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:6px;
+    background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#a5b4fc;
+    letter-spacing:0.05em;
+  }
+  .demo-stage {
+    display:grid;grid-template-columns:1fr 1fr;gap:0;
+    min-height:280px;
+  }
+  .demo-tile {
+    position:relative;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:0.5rem;padding:2rem 1.5rem;min-height:240px;
+  }
+  .demo-tile:first-child { border-right:1px solid var(--border); }
+  .demo-tile-bg {
+    position:absolute;inset:0;opacity:0.18;
+  }
+  .demo-tile-bg.a { background:radial-gradient(circle at 30% 30%,#7c3aed,transparent 65%); }
+  .demo-tile-bg.b { background:radial-gradient(circle at 70% 70%,#0ea5e9,transparent 65%); }
+  .demo-tile-avatar {
+    width:56px;height:56px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:1.4rem;color:white;
+    position:relative;z-index:1;
+  }
+  .demo-tile-avatar.va { background:linear-gradient(135deg,#7c3aed,#6366f1); }
+  .demo-tile-avatar.vb { background:linear-gradient(135deg,#0ea5e9,#6366f1); }
+  .demo-tile-name {
+    font-size:0.78rem;font-weight:600;color:var(--text-mid);position:relative;z-index:1;
+    display:flex;align-items:center;gap:0.4rem;
+  }
+  .demo-lang-badge {
+    font-size:0.6rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.25);
+    border-radius:4px;padding:0.1rem 0.35rem;color:#a5b4fc;font-weight:700;letter-spacing:0.04em;
+  }
+  /* Waveform on speaking tile */
+  .demo-waves {
+    display:flex;align-items:center;gap:2.5px;height:28px;
+    position:relative;z-index:1;opacity:0;
+    transition:opacity 0.4s ease;
+  }
+  .demo-tile.speaking .demo-waves { opacity:1; }
+  .demo-waves .w {
+    width:3px;border-radius:3px;
+    background:linear-gradient(to top,var(--violet),var(--cyan));
+    animation:waveBar 0.9s ease-in-out infinite;
+  }
+  .demo-waves .w:nth-child(1){height:8px;animation-delay:0s}
+  .demo-waves .w:nth-child(2){height:18px;animation-delay:0.12s}
+  .demo-waves .w:nth-child(3){height:26px;animation-delay:0.24s}
+  .demo-waves .w:nth-child(4){height:20px;animation-delay:0.08s}
+  .demo-waves .w:nth-child(5){height:12px;animation-delay:0.18s}
+  .demo-tile.speaking { animation:speakingPulse 2s ease-in-out infinite; }
+  @keyframes speakingPulse {
+    0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0);}
+    50%{box-shadow:inset 0 0 0 2px rgba(99,102,241,0.25);}
+  }
+  /* Caption bar in demo */
+  .demo-caption {
+    padding:0.875rem 1.25rem;border-top:1px solid var(--border);
+    display:flex;align-items:center;gap:0.75rem;min-height:54px;
+    background:rgba(0,0,0,0.15);
+  }
+  html.light .demo-caption { background:rgba(0,0,0,0.04); }
+  .demo-caption-speaker {
+    font-size:0.65rem;font-weight:800;color:#a5b4fc;white-space:nowrap;letter-spacing:0.06em;text-transform:uppercase;
+    flex-shrink:0;
+  }
+  .demo-caption-text {
+    font-size:1rem;font-weight:600;color:var(--text);flex:1;text-align:left;min-height:1.4em;
+  }
+  .demo-caption-cursor {
+    display:inline-block;width:2px;height:1em;background:var(--cyan);
+    animation:blink 0.8s step-end infinite;vertical-align:text-bottom;margin-left:2px;
+  }
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+  /* ── Stats Section ────────────────────────────────── */
+  .stats-section {
+    padding:5rem 2rem; background:#000;
+    border-top:1px solid rgba(255,255,255,0.06);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  html.light .stats-section { background:#f2f2f7; border-color:rgba(0,0,0,0.06); }
+  .stats-grid {
+    max-width:900px;margin:0 auto;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:24px; overflow:hidden;
+  }
+  html.light .stats-grid { background:rgba(255,255,255,0.60); border-color:rgba(0,0,0,0.08); }
+  .stat-box {
+    text-align:center;padding:2.5rem 1rem;
+    border-right:1px solid rgba(255,255,255,0.06);
+    transition:background 0.3s;
+  }
+  html.light .stat-box { border-right-color:rgba(0,0,0,0.06); }
+  .stat-box:last-child { border-right:none; }
+  .stat-box:hover { background:rgba(255,255,255,0.04); }
+  html.light .stat-box:hover { background:rgba(255,255,255,0.40); }
+  .stat-num {
+    font-size:3rem;font-weight:900;letter-spacing:-0.05em;line-height:1;
+    color:white;
+  }
+  html.light .stat-num { color:#1c1c1e; }
+  .stat-suffix-inline {
+    font-size:2rem;font-weight:900;letter-spacing:-0.03em;color:white;
+  }
+  html.light .stat-suffix-inline { color:#1c1c1e; }
+  .stat-box-label {
+    font-size:0.78rem;font-weight:600;color:rgba(255,255,255,0.55);margin-top:0.5rem;letter-spacing:0.01em;
+  }
+  html.light .stat-box-label { color:rgba(0,0,0,0.50); }
+  .stat-box-sub {
+    font-size:0.68rem;color:rgba(255,255,255,0.28);margin-top:0.2rem;
+  }
+  html.light .stat-box-sub { color:rgba(0,0,0,0.30); }
+
+  /* ── Testimonials ─────────────────────────────────── */
+  .testimonials {
+    padding:6rem 2rem;background:#000;
+  }
+  html.light .testimonials { background:#f2f2f7; }
+  .testimonials-grid {
+    max-width:1100px;margin:2.5rem auto 0;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;
+  }
+  .t-card {
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:22px;
+    padding:1.75rem;display:flex;flex-direction:column;gap:1.2rem;
+    transition:transform 0.3s,background 0.3s,border-color 0.3s;
+    opacity:0;transform:translateY(30px);
+    backdrop-filter:blur(20px);
+    position:relative;overflow:hidden;
+  }
+  .t-card::before {
+    content:'';position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);
+  }
+  .t-card:hover {
+    transform:translateY(-4px);
+    background:rgba(255,255,255,0.07);
+    border-color:rgba(139,92,246,0.25);
+  }
+  html.light .t-card { background:rgba(255,255,255,0.55); border-color:rgba(0,0,0,0.08); }
+  html.light .t-card::before { background:linear-gradient(90deg,transparent,rgba(0,0,0,0.05),transparent); }
+  html.light .t-card:hover { background:rgba(255,255,255,0.85); border-color:rgba(124,58,237,0.20); }
+  .t-stars { display:flex;gap:2px; }
+  .t-star { color:#f59e0b;font-size:0.85rem; }
+  .t-quote {
+    font-size:0.95rem;line-height:1.65;color:rgba(255,255,255,0.75);
+    flex:1;
+  }
+  html.light .t-quote { color:var(--text-mid); }
+  .t-author { display:flex;align-items:center;gap:0.75rem; }
+  .t-avatar {
+    width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:0.9rem;color:white;flex-shrink:0;
+  }
+  .t-avatar.ta { background:linear-gradient(135deg,#7c3aed,#6366f1); }
+  .t-avatar.tb { background:linear-gradient(135deg,#0ea5e9,#6366f1); }
+  .t-avatar.tc { background:linear-gradient(135deg,#10b981,#6366f1); }
+  .t-name  { font-size:0.82rem;font-weight:700;color:rgba(255,255,255,0.90); }
+  html.light .t-name { color:var(--text); }
+  .t-role  { font-size:0.7rem;color:rgba(255,255,255,0.35);margin-top:1px; }
+  html.light .t-role { color:var(--text-dim); }
+
+  /* ── Marquee logos strip ─────────────────────────── */
+  .logos-strip {
+    padding:2.5rem 0;background:rgba(255,255,255,0.03);
+    border-top:1px solid rgba(255,255,255,0.06);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    overflow:hidden;
+  }
+  html.light .logos-strip { background:rgba(0,0,0,0.03); border-color:rgba(0,0,0,0.06); }
+  .logos-track {
+    display:flex;gap:3rem;white-space:nowrap;
+    animation:marqueeScroll 20s linear infinite;
+    width:max-content;
+  }
+  .logos-track:hover { animation-play-state:paused; }
+  .logo-item {
+    display:flex;align-items:center;gap:0.5rem;
+    font-weight:800;font-size:0.9rem;color:var(--text-dim);letter-spacing:0.04em;
+    opacity:0.55;flex-shrink:0;
+  }
+  .logo-dot { width:6px;height:6px;border-radius:50%;background:var(--violet);display:inline-block; }
+  @keyframes marqueeScroll {
+    from{transform:translateX(0)}
+    to{transform:translateX(-50%)}
+  }
+
+  @media(max-width:768px){
+    .demo-stage{grid-template-columns:1fr;grid-template-rows:1fr 1fr;}
+    .demo-tile:first-child{border-right:none;border-bottom:1px solid var(--border);}
+    .stats-grid{grid-template-columns:repeat(2,1fr);}
+    .stat-box:nth-child(2){border-right:none;}
+    .stat-box:nth-child(3){border-top:1px solid var(--border);}
+    .testimonials-grid{grid-template-columns:1fr;}
+  }
+  </style>
+</head>
+<body>
+
+<!-- Scroll progress -->
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <img src="/img/logo.png" alt="Clario" class="nav-logo-img" />
+      <span>Clario</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#languages">Languages</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <button class="theme-toggle" id="themeToggle" title="Toggle light / dark mode" aria-label="Toggle theme">
+        <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+      <button class="btn-nav" id="navCTA">Start Meeting →</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="hero-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="lang-pills">
+    <div class="lang-pill">🇮🇳 Hindi</div>
+    <div class="lang-pill">🇩🇪 Deutsch</div>
+    <div class="lang-pill">🇯🇵 日本語</div>
+    <div class="lang-pill">🇧🇷 Português</div>
+    <div class="lang-pill">🇸🇦 العربية</div>
+    <div class="lang-pill">🇰🇷 한국어</div>
+  </div>
+
+  <div class="hero-content">
+    <div class="hero-badge">✦ Powered by Google Gemini 2.5</div>
+
+    <!-- Language rotator -->
+    <div class="lang-rotator">
+      <span class="rotator-label">Say</span>
+      <div class="rotator-word-wrap" id="rotatorWrap">
+        <span class="rotator-word active">Hello</span>
+        <span class="rotator-word">नमस्ते</span>
+        <span class="rotator-word">Hola</span>
+        <span class="rotator-word">Bonjour</span>
+        <span class="rotator-word">こんにちは</span>
+        <span class="rotator-word">مرحبا</span>
+        <span class="rotator-word">안녕하세요</span>
+      </div>
+      <span class="rotator-label">— everyone understands.</span>
+    </div>
+
+    <h1 class="hero-title">
+      <span class="line">Speak Your Language.</span>
+      <span class="line gradient-text">Everyone Understands.</span>
+    </h1>
+
+    <p class="hero-sub">
+      Real-time AI translation and captions during video calls — breaking language barriers instantly across 10+ languages with no setup required.
+    </p>
+
+    <div class="hero-actions">
+      <button class="btn-primary" id="heroCTA">Start a Meeting →</button>
+      <a href="#features" class="btn-ghost">See how it works ↓</a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-val">10+</span>
+        <span class="stat-label">Languages</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-val">&lt;6s</span>
+        <span class="stat-label">Latency</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-val">AI</span>
+        <span class="stat-label">Powered</span>
+      </div>
+    </div>
+
+    <!-- Animated waveform -->
+    <div class="hero-wave">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+  </div>
+
+  <!-- Preview cards -->
+  <div class="hero-preview">
+    <div class="preview-tile">
+      <div class="preview-avatar">A</div>
+      <div class="preview-name">Arjun · Hindi</div>
+      <div class="preview-caption">"नमस्ते! आप कैसे हैं?"</div>
+    </div>
+    <div class="preview-arrow">↔</div>
+    <div class="preview-tile">
+      <div class="preview-avatar b2">M</div>
+      <div class="preview-name">Maria · English</div>
+      <div class="preview-caption">"Hello! How are you?" ✓</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── STATS SECTION ───────────────────────────────────── -->
+<section class="stats-section">
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:2px;">
+        <span class="stat-num" data-target="10" data-suffix="+">0</span>
+        <span class="stat-suffix-inline">+</span>
+      </div>
+      <div class="stat-box-label">Languages</div>
+      <div class="stat-box-sub">and growing</div>
+    </div>
+    <div class="stat-box">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:2px;">
+        <span style="font-size:2rem;font-weight:900;color:var(--text-dim)">&lt;</span>
+        <span class="stat-num" data-target="6">0</span>
+        <span class="stat-suffix-inline">s</span>
+      </div>
+      <div class="stat-box-label">End-to-end latency</div>
+      <div class="stat-box-sub">speech → translated caption</div>
+    </div>
+    <div class="stat-box">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:2px;">
+        <span class="stat-num" data-target="100">0</span>
+        <span class="stat-suffix-inline">%</span>
+      </div>
+      <div class="stat-box-label">Browser native</div>
+      <div class="stat-box-sub">no install, no plugin</div>
+    </div>
+    <div class="stat-box">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:2px;">
+        <span class="stat-num" data-target="0">99</span>
+      </div>
+      <div class="stat-box-label">Setup required</div>
+      <div class="stat-box-sub">open a link and go</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FEATURES ────────────────────────────────────────── -->
+<section class="features" id="features">
+  <div class="section-inner">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Built for global collaboration</h2>
+    <p class="section-sub">No more language barriers. Our AI handles translation, transcription and audio — all in real time.</p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-top-line"></div>
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="2" y1="12" x2="4.5" y2="12"/><line x1="6.5" y1="7" x2="6.5" y2="17"/>
+            <line x1="10" y1="3" x2="10" y2="21"/><line x1="14" y1="5" x2="14" y2="19"/>
+            <line x1="17.5" y1="9" x2="17.5" y2="15"/><line x1="19.5" y1="12" x2="22" y2="12"/>
+          </svg>
+        </div>
+        <h3>Live Transcription</h3>
+        <p>Your voice is captured and transcribed in real time using Gemini's multimodal AI — accurate, fast, and context-aware.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-top-line"></div>
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M3.6 9h16.8M3.6 15h16.8"/>
+            <path d="M12 3c-3.5 4-3.5 14 0 18M12 3c3.5 4 3.5 14 0 18"/>
+          </svg>
+        </div>
+        <h3>Instant Translation</h3>
+        <p>Each participant sees captions in their own chosen language — simultaneously, with no delay between speakers.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-top-line"></div>
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+            <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+          </svg>
+        </div>
+        <h3>Dubbed Audio</h3>
+        <p>Hear the speaker's voice translated and spoken aloud in your language using Gemini's neural TTS engine.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-top-line"></div>
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <h3>Team Chat</h3>
+        <p>Send messages during a call — no switching apps. Chat history stays in the session for all participants.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-top-line"></div>
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h3>Admit Control</h3>
+        <p>First participant becomes host. New joiners wait in the lobby until the host admits or denies them.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-top-line"></div>
+        <div class="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+        <h3>Zero Setup</h3>
+        <p>Open a link, share a room code. Works in any modern browser — no extension, no install, no account required.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TESTIMONIALS ────────────────────────────────────── -->
+<section class="testimonials" id="testimonials">
+  <div class="section-inner" style="text-align:center;">
+    <div class="section-label">Testimonials</div>
+    <h2 class="section-title">Loved by global teams</h2>
+    <p class="section-sub">Real feedback from teams breaking language barriers every day.</p>
+  </div>
+  <div class="testimonials-grid" style="max-width:1100px;margin:2.5rem auto 0;padding:0 2rem;">
+    <div class="t-card">
+      <div class="t-stars">★★★★★</div>
+      <p class="t-quote">"We run standups across 4 countries — Tokyo, Berlin, São Paulo, and Mumbai. Clario means everyone actually understands each other without needing a translator on every call."</p>
+      <div class="t-author">
+        <div class="t-avatar ta">N</div>
+        <div>
+          <div class="t-name">Nadia Hoffmann</div>
+          <div class="t-role">VP Engineering · GlobalTech GmbH</div>
+        </div>
+      </div>
+    </div>
+    <div class="t-card">
+      <div class="t-stars">★★★★★</div>
+      <p class="t-quote">"The captions are fast and accurate. Our Korean and English teams now collaborate directly — no more 24-hour email delays waiting for someone to translate back and forth."</p>
+      <div class="t-author">
+        <div class="t-avatar tb">J</div>
+        <div>
+          <div class="t-name">James Park</div>
+          <div class="t-role">Product Lead · Nexus Ventures</div>
+        </div>
+      </div>
+    </div>
+    <div class="t-card">
+      <div class="t-stars">★★★★★</div>
+      <p class="t-quote">"I was skeptical but the translated audio mode genuinely works. I can listen to my French colleague speak and hear it in Hindi. Feels like the future."</p>
+      <div class="t-author">
+        <div class="t-avatar tc">R</div>
+        <div>
+          <div class="t-name">Ravi Anand</div>
+          <div class="t-role">CTO · FinBridge India</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LOGO MARQUEE ───────────────────────────────────── -->
+<div class="logos-strip">
+  <div class="logos-track">
+    <span class="logo-item"><span class="logo-dot"></span>ENTERPRISE READY</span>
+    <span class="logo-item"><span class="logo-dot"></span>REAL-TIME AI</span>
+    <span class="logo-item"><span class="logo-dot"></span>GOOGLE GEMINI 2.5</span>
+    <span class="logo-item"><span class="logo-dot"></span>WEBRTC NATIVE</span>
+    <span class="logo-item"><span class="logo-dot"></span>END-TO-END</span>
+    <span class="logo-item"><span class="logo-dot"></span>10+ LANGUAGES</span>
+    <span class="logo-item"><span class="logo-dot"></span>ZERO INSTALL</span>
+    <span class="logo-item"><span class="logo-dot"></span>OPEN ANY BROWSER</span>
+    <!-- duplicate for seamless loop -->
+    <span class="logo-item"><span class="logo-dot"></span>ENTERPRISE READY</span>
+    <span class="logo-item"><span class="logo-dot"></span>REAL-TIME AI</span>
+    <span class="logo-item"><span class="logo-dot"></span>GOOGLE GEMINI 2.5</span>
+    <span class="logo-item"><span class="logo-dot"></span>WEBRTC NATIVE</span>
+    <span class="logo-item"><span class="logo-dot"></span>END-TO-END</span>
+    <span class="logo-item"><span class="logo-dot"></span>10+ LANGUAGES</span>
+    <span class="logo-item"><span class="logo-dot"></span>ZERO INSTALL</span>
+    <span class="logo-item"><span class="logo-dot"></span>OPEN ANY BROWSER</span>
+  </div>
+</div>
+
+<!-- ── HOW IT WORKS ───────────────────────────────────── -->
+<section class="how" id="how">
+  <div class="section-inner">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Three steps to speak freely</h2>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="step-num">01</div>
+        <h3>Create or Join</h3>
+        <p>Enter your name, pick your language, and share the room link. Anyone can join from any device.</p>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step">
+        <div class="step-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <div class="step-num">02</div>
+        <h3>Speak Naturally</h3>
+        <p>Our AI detects your voice automatically and sends only real speech to Gemini — silence is ignored.</p>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step">
+        <div class="step-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="3"/>
+            <path d="M7 15h3M14 15h3"/><path d="M7 11h2M12 11h5"/>
+          </svg>
+        </div>
+        <div class="step-num">03</div>
+        <h3>See &amp; Hear</h3>
+        <p>Others instantly see live captions in their language — or toggle to hear translated audio spoken aloud.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LANGUAGES ─────────────────────────────────────── -->
+<section class="languages" id="languages">
+  <div class="section-inner">
+    <div class="section-label">Languages</div>
+    <h2 class="section-title">10 languages supported</h2>
+    <p class="section-sub">More languages added continuously. Set your source and target independently for each participant.</p>
+
+    <div class="lang-grid">
+      <div class="lang-card">🇬🇧<span>English</span></div>
+      <div class="lang-card">🇮🇳<span>Hindi</span></div>
+      <div class="lang-card">🇪🇸<span>Spanish</span></div>
+      <div class="lang-card">🇫🇷<span>French</span></div>
+      <div class="lang-card">🇩🇪<span>German</span></div>
+      <div class="lang-card">🇨🇳<span>Mandarin</span></div>
+      <div class="lang-card">🇸🇦<span>Arabic</span></div>
+      <div class="lang-card">🇧🇷<span>Portuguese</span></div>
+      <div class="lang-card">🇯🇵<span>Japanese</span></div>
+      <div class="lang-card">🇰🇷<span>Korean</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── JOIN ──────────────────────────────────────────── -->
+<section class="join-section" id="join">
+  <div class="section-inner">
+    <div class="section-label">Get Started</div>
+    <h2 class="section-title">Ready to speak freely?</h2>
+    <p class="section-sub">Create a room or join an existing one. Free. No account needed.</p>
+
+    <div class="join-card">
+      <form id="joinForm">
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input type="text" id="displayName" class="form-input" placeholder="Enter your name" required maxlength="40" autocomplete="off" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">I Speak</label>
+            <div class="select-wrap">
+              <select id="sourceLang" class="form-select">
+                <option value="en">🇬🇧 English</option><option value="hi">🇮🇳 Hindi</option>
+                <option value="es">🇪🇸 Spanish</option><option value="fr">🇫🇷 French</option>
+                <option value="de">🇩🇪 German</option><option value="zh">🇨🇳 Mandarin</option>
+                <option value="ar">🇸🇦 Arabic</option><option value="pt">🇧🇷 Portuguese</option>
+                <option value="ja">🇯🇵 Japanese</option><option value="ko">🇰🇷 Korean</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">I Hear In</label>
+            <div class="select-wrap">
+              <select id="targetLang" class="form-select">
+                <option value="en">🇬🇧 English</option><option value="hi">🇮🇳 Hindi</option>
+                <option value="es">🇪🇸 Spanish</option><option value="fr">🇫🇷 French</option>
+                <option value="de">🇩🇪 German</option><option value="zh">🇨🇳 Mandarin</option>
+                <option value="ar">🇸🇦 Arabic</option><option value="pt">🇧🇷 Portuguese</option>
+                <option value="ja">🇯🇵 Japanese</option><option value="ko">🇰🇷 Korean</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Room ID <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim)">(leave blank to create new)</span></label>
+          <input type="text" id="roomId" class="form-input" placeholder="e.g. my-team-standup" maxlength="64" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn-join">Join Call →</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-logo">
+    <img src="/img/logo.png" alt="Clario" class="footer-logo-img" />
+    <span>Clario</span>
+  </div>
+  <span style="color:var(--text-dim)">·</span>
+  <span>Powered by Google Gemini AI</span>
+  <span style="color:var(--text-dim)">·</span>
+  <span>Real-time translation for everyone</span>
+</footer>
+
+<!-- SCRIPTS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
+
+<script>
+/* ── Lenis smooth scroll ──────────────────────────────────── */
+const lenis = new Lenis({
+  duration: 0.75,
+  easing: t => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
+  smoothWheel: true, wheelMultiplier: 1, touchMultiplier: 2,
+});
+gsap.registerPlugin(ScrollTrigger);
+gsap.ticker.add(time => lenis.raf(time * 1000));
+gsap.ticker.lagSmoothing(0);
+lenis.on('scroll', ScrollTrigger.update);
+
+/* ── Scroll progress bar ──────────────────────────────────── */
+gsap.to('#scrollProgress', {
+  scaleX: 1, ease: 'none',
+  scrollTrigger: { trigger: document.body, start: 'top top', end: 'bottom bottom', scrub: 0.3 }
+});
+
+/* ── Nav scroll ───────────────────────────────────────────── */
+ScrollTrigger.create({
+  trigger: 'body', start: '60px top',
+  onEnter: () => document.getElementById('nav').classList.add('scrolled'),
+  onLeaveBack: () => document.getElementById('nav').classList.remove('scrolled'),
+});
+
+/* ── Hero entrance ────────────────────────────────────────── */
+const heroTl = gsap.timeline({ delay: 0.15 });
+heroTl.to('.orb', { opacity: 1, duration: 2, stagger: 0.3, ease: 'power2.out' }, 0);
+heroTl.to('.hero-badge', { opacity: 1, y: 0, duration: 0.7, ease: 'power3.out' }, 0.2);
+heroTl.to('.lang-rotator', { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.35);
+heroTl.to('.hero-title .line', { opacity: 1, y: 0, duration: 0.9, stagger: 0.18, ease: 'power3.out' }, 0.45);
+heroTl.to('.hero-sub',     { opacity: 1, duration: 0.7, ease: 'power2.out' }, 0.7);
+heroTl.to('.hero-actions', { opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }, 0.9);
+heroTl.to('.hero-stats',   { opacity: 1, duration: 0.6, ease: 'power2.out' }, 1.0);
+heroTl.to('.hero-preview', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }, 1.1);
+
+/* ── Orb float ────────────────────────────────────────────── */
+gsap.to('.orb-1', { x: 40, y: -50, duration: 9, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+gsap.to('.orb-2', { x: -30, y: 40, duration: 11, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 2 });
+gsap.to('.orb-3', { x: 20, y: -30, duration: 13, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 4 });
+
+/* ── Parallax ─────────────────────────────────────────────── */
+gsap.to('.hero-content', { y: -80, scrollTrigger: { trigger: '.hero', scrub: 1.5, start: 'top top', end: 'bottom top' } });
+gsap.to('.orb-1', { y: '-=120', scrollTrigger: { trigger: '.hero', scrub: 2, start: 'top top', end: 'bottom top' } });
+gsap.to('.orb-2', { y: '-=70',  scrollTrigger: { trigger: '.hero', scrub: 1.5, start: 'top top', end: 'bottom top' } });
+gsap.to('.hero-preview', { y: 60, scrollTrigger: { trigger: '.hero', scrub: 1.2, start: 'top top', end: 'bottom top' } });
+
+/* ── Language rotator ─────────────────────────────────────── */
+const words = document.querySelectorAll('.rotator-word');
+let wIdx = 0;
+setInterval(() => {
+  words[wIdx].classList.remove('active');
+  words[wIdx].classList.add('leaving');
+  setTimeout(() => words[wIdx].classList.remove('leaving'), 500);
+  wIdx = (wIdx + 1) % words.length;
+  words[wIdx].classList.add('active');
+}, 2000);
+
+
+/* ── Animated stat counters ───────────────────────────────── */
+gsap.utils.toArray('.stat-num').forEach(el => {
+  const target = parseInt(el.dataset.target);
+  ScrollTrigger.create({
+    trigger: el, start: 'top 88%', once: true,
+    onEnter: () => {
+      gsap.fromTo(el, { innerText: 0 }, {
+        innerText: target, duration: 1.8, ease: 'power2.out', snap: { innerText: 1 },
+        onUpdate() { el.textContent = Math.round(parseFloat(el.innerHTML)); }
+      });
+    }
+  });
+});
+
+/* ── Scroll reveals ───────────────────────────────────────── */
+gsap.to('.feature-card', {
+  opacity: 1, y: 0, duration: 0.75, stagger: 0.1, ease: 'power3.out',
+  scrollTrigger: { trigger: '.feature-grid', start: 'top 82%' }
+});
+gsap.to('.step', {
+  opacity: 1, y: 0, duration: 0.7, stagger: 0.18, ease: 'power3.out',
+  scrollTrigger: { trigger: '.steps', start: 'top 82%' }
+});
+gsap.to('.step-connector', {
+  opacity: 1, duration: 0.5, delay: 0.3,
+  scrollTrigger: { trigger: '.steps', start: 'top 82%' }
+});
+gsap.to('.lang-card', {
+  opacity: 1, scale: 1, duration: 0.5, stagger: 0.06, ease: 'back.out(1.5)',
+  scrollTrigger: { trigger: '.lang-grid', start: 'top 85%' }
+});
+gsap.to('.t-card', {
+  opacity: 1, y: 0, duration: 0.7, stagger: 0.15, ease: 'power3.out',
+  scrollTrigger: { trigger: '.testimonials-grid', start: 'top 85%' }
+});
+gsap.from('.join-card', {
+  opacity: 0, y: 40, duration: 0.8, ease: 'power3.out',
+  scrollTrigger: { trigger: '.join-card', start: 'top 88%' }
+});
+gsap.from('.stats-grid', {
+  opacity: 0, y: 32, scale: 0.98, duration: 0.8, ease: 'power3.out',
+  scrollTrigger: { trigger: '.stats-grid', start: 'top 88%' }
+});
+gsap.from('.logos-strip', {
+  opacity: 0, duration: 0.8, ease: 'power2.out',
+  scrollTrigger: { trigger: '.logos-strip', start: 'top 95%' }
+});
+gsap.from('.footer', {
+  opacity: 0, y: 16, duration: 0.7, ease: 'power2.out',
+  scrollTrigger: { trigger: '.footer', start: 'top 98%' }
+});
+/* Gentle float loop on preview tiles */
+gsap.utils.toArray('.preview-tile').forEach((el, i) => {
+  gsap.to(el, { y: i % 2 ? 8 : -8, duration: 3.2 + i, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 1.5 });
+});
+gsap.utils.toArray('.section-title,.section-label,.section-sub,.demo-inner h2,.demo-inner p').forEach(el => {
+  gsap.from(el, {
+    opacity: 0, y: 24, duration: 0.7, ease: 'power2.out',
+    scrollTrigger: { trigger: el, start: 'top 90%' }
+  });
+});
+
+/* ── Form ────────────────────────────────────────────────── */
+document.getElementById('joinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name   = document.getElementById('displayName').value.trim();
+  const source = document.getElementById('sourceLang').value;
+  const target = document.getElementById('targetLang').value;
+  let roomId   = document.getElementById('roomId').value.trim();
+  if (!roomId) roomId = Math.random().toString(36).slice(2, 10);
+  window.location.href = `/call.html?${new URLSearchParams({ name, source, target, room: roomId })}`;
+});
+document.getElementById('sourceLang').addEventListener('change', e => {
+  document.getElementById('targetLang').value = e.target.value;
+});
+function scrollToJoin() { lenis.scrollTo('#join', { offset: -80, duration: 0.9 }); }
+document.getElementById('heroCTA').addEventListener('click', scrollToJoin);
+document.getElementById('navCTA').addEventListener('click', scrollToJoin);
+document.querySelector('.btn-ghost').addEventListener('click', e => {
+  e.preventDefault();
+  lenis.scrollTo('#features', { offset: -80, duration: 0.9 });
+});
+
+/* ── Theme toggle ─────────────────────────────────────────── */
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const isLight = document.documentElement.classList.toggle('light');
+  localStorage.setItem('pm-theme', isLight ? 'light' : 'dark');
+});
+</script>
+
+</body>
+</html>

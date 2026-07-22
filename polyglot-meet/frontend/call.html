@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clario — Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script>if(localStorage.getItem('pm-theme')==='light')document.documentElement.classList.add('light');</script>
+  <style>
+    /* ── SVG icon helpers ─────────────────────────────── */
+    .icon { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+    /* ── Topbar refinements ───────────────────────────── */
+    .topbar-logo { text-decoration:none; }
+    .topbar-logo-svg { width:28px;height:28px;border-radius:7px;
+      background:linear-gradient(135deg,#7c3aed,#6366f1);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+
+    #copyRoomBtn { display:inline-flex;align-items:center;justify-content:center;
+      background:none;border:none;cursor:pointer;
+      color:var(--cyan);padding:0 0 0 4px;opacity:0.7;transition:opacity 0.2s; }
+    #copyRoomBtn:hover { opacity:1; }
+
+    .mode-btn { display:flex;align-items:center;gap:0.35rem; }
+
+    /* ── Control bar ──────────────────────────────────── */
+    .ctrl-btn { min-width:68px;gap:0.28rem; }
+    .ctrl-btn .ctrl-icon { width:24px;height:24px;display:flex;align-items:center;justify-content:center; }
+    .ctrl-btn.danger svg { stroke:white; }
+    .ctrl-btn.off svg   { stroke:#ef4444; }
+
+    /* Mic / Cam state toggles */
+    .mic-slash, .cam-slash { display:none; }
+    .ctrl-btn.off .mic-slash,
+    .ctrl-btn.off .cam-slash { display:block; }
+    .ctrl-btn.off .mic-on,
+    .ctrl-btn.off .cam-on   { display:none; }
+
+    /* Chat button badge */
+    .ctrl-btn-wrap { position:relative;display:inline-flex; }
+    .chat-badge {
+      position:absolute;top:-5px;right:-5px;
+      background:#6366f1;color:#fff;border-radius:9999px;
+      font-size:0.6rem;font-weight:700;
+      min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 4px;
+      display:none;
+    }
+    .chat-badge.has-unread { display:block; }
+
+    /* Translating pill */
+    .tile-translating { letter-spacing:0.04em;font-size:0.62rem; }
+
+    /* mode-btn overrides */
+    .mode-btn { display: flex; flex-direction: row; align-items: center; }
+
+    /* ═══════════════════════════════════════════════════
+       WAITING ROOM OVERLAY
+    ═══════════════════════════════════════════════════ */
+    /* ── WAITING OVERLAY (glass) ── */
+    .waiting-overlay {
+      position:fixed;inset:0;z-index:200;
+      background:rgba(0,0,0,0.85);
+      display:flex;align-items:center;justify-content:center;
+      backdrop-filter:blur(80px) saturate(200%);
+      -webkit-backdrop-filter:blur(80px) saturate(200%);
+    }
+    .waiting-overlay.hidden { display:none; }
+    .waiting-card {
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:28px;
+      padding:3rem 3.5rem;
+      text-align:center;
+      max-width:400px;
+      width:90%;
+      display:flex;flex-direction:column;align-items:center;gap:1.2rem;
+      backdrop-filter:blur(40px) saturate(180%);
+      -webkit-backdrop-filter:blur(40px) saturate(180%);
+      box-shadow:0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .waiting-spinner {
+      width:52px;height:52px;border-radius:50%;
+      border:2.5px solid rgba(139,92,246,0.2);
+      border-top-color:var(--violet-2);
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .waiting-card h2 {
+      font-size:1.3rem;font-weight:700;color:white;
+      letter-spacing:-0.03em;margin:0;
+    }
+    .waiting-card p {
+      color:rgba(255,255,255,0.50);font-size:0.9rem;margin:0;
+    }
+    .waiting-user-name {
+      display:flex;align-items:center;gap:0.6rem;
+      background:rgba(139,92,246,0.12);
+      border:1px solid rgba(139,92,246,0.22);
+      border-radius:100px;padding:0.5rem 1rem;
+      color:white;font-weight:600;font-size:0.9rem;
+    }
+    .waiting-user-avatar {
+      width:28px;height:28px;border-radius:50%;
+      background:linear-gradient(135deg,#7c3aed,#6366f1);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:0.8rem;color:white;flex-shrink:0;
+    }
+    #waitingLeaveBtn {
+      margin-top:0.5rem;background:rgba(239,68,68,0.08);
+      border:1px solid rgba(239,68,68,0.25);
+      color:#f87171;border-radius:100px;padding:0.5rem 1.4rem;
+      font-size:0.78rem;cursor:pointer;font-family:inherit;
+      transition:all 0.2s;
+    }
+    #waitingLeaveBtn:hover { background:rgba(239,68,68,0.15); }
+
+    /* ── REJECTED OVERLAY (glass) ── */
+    .rejected-overlay {
+      position:fixed;inset:0;z-index:200;
+      background:rgba(0,0,0,0.85);
+      display:flex;align-items:center;justify-content:center;
+      backdrop-filter:blur(80px) saturate(200%);
+      -webkit-backdrop-filter:blur(80px) saturate(200%);
+    }
+    .rejected-overlay.hidden { display:none; }
+    .rejected-card {
+      background:rgba(239,68,68,0.05);
+      border:1px solid rgba(239,68,68,0.18);
+      border-radius:28px;padding:3rem;text-align:center;
+      max-width:380px;width:90%;
+      display:flex;flex-direction:column;align-items:center;gap:1rem;
+      backdrop-filter:blur(40px);
+      box-shadow:0 32px 80px rgba(0,0,0,0.6);
+    }
+    .rejected-icon {
+      width:56px;height:56px;border-radius:50%;
+      background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.2);
+      display:flex;align-items:center;justify-content:center;
+    }
+    .rejected-card h2 { font-size:1.2rem;font-weight:700;color:#f87171;margin:0;letter-spacing:-0.02em; }
+    .rejected-card p  { color:rgba(255,255,255,0.45);font-size:0.875rem;margin:0; }
+    #rejectedBackBtn {
+      margin-top:0.5rem;
+      background:white;
+      border:none;border-radius:100px;padding:0.65rem 1.8rem;
+      color:#000;font-size:0.85rem;font-weight:700;cursor:pointer;
+      font-family:inherit;transition:opacity 0.2s,transform 0.2s;letter-spacing:-0.01em;
+    }
+    #rejectedBackBtn:hover { opacity:0.88;transform:scale(1.02); }
+
+    /* ── ADMIT STACK (glass) ── */
+    .admit-stack {
+      position:fixed;bottom:100px;right:1.5rem;
+      z-index:150;
+      display:flex;flex-direction:column-reverse;gap:0.75rem;
+      pointer-events:none;
+    }
+    .admit-card {
+      background:rgba(0,0,0,0.78);
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:20px;padding:1rem 1.1rem;
+      min-width:280px;max-width:320px;
+      backdrop-filter:blur(40px) saturate(180%);
+      -webkit-backdrop-filter:blur(40px) saturate(180%);
+      box-shadow:0 16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+      box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      pointer-events:all;
+      animation:slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { opacity:0;transform:translateY(16px); } to { opacity:1;transform:translateY(0); } }
+    .admit-card-top {
+      display:flex;align-items:center;gap:0.75rem;margin-bottom:0.85rem;
+    }
+    .admit-avatar {
+      width:36px;height:36px;border-radius:50%;
+      background:linear-gradient(135deg,#7c3aed,#6366f1);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:0.9rem;color:white;flex-shrink:0;
+    }
+    .admit-info { flex:1;min-width:0; }
+    .admit-name-text { font-weight:600;color:white;font-size:0.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em; }
+    .admit-sub { color:rgba(255,255,255,0.40);font-size:0.75rem;margin-top:1px; }
+    .admit-btns { display:flex;gap:0.5rem; }
+    .admit-deny-btn {
+      flex:1;padding:0.45rem;border-radius:100px;
+      background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.22);
+      color:#f87171;font-size:0.75rem;font-weight:600;cursor:pointer;
+      font-family:inherit;transition:all 0.15s;
+    }
+    .admit-deny-btn:hover { background:rgba(239,68,68,0.18); }
+    .admit-allow-btn {
+      flex:1;padding:0.45rem;border-radius:100px;
+      background:rgba(255,255,255,0.90);border:none;
+      color:#000;font-size:0.75rem;font-weight:700;cursor:pointer;
+      font-family:inherit;transition:all 0.15s;
+    }
+    .admit-allow-btn:hover { background:white; }
+
+    /* ═══════════════════════════════════════════════════
+       CHAT PANEL
+    ═══════════════════════════════════════════════════ */
+    /* ── CHAT PANEL (glass overlay) ── */
+    .chat-panel {
+      position:fixed;top:0;right:0;height:100%;
+      width:320px;max-width:90vw;
+      background:rgba(0,0,0,0.75);
+      border-left:1px solid rgba(255,255,255,0.10);
+      backdrop-filter:blur(60px) saturate(200%);
+      -webkit-backdrop-filter:blur(60px) saturate(200%);
+      display:flex;flex-direction:column;
+      z-index:120;
+      transform:translateX(100%);
+      transition:transform 0.4s cubic-bezier(0.34,1.2,0.64,1);
+    }
+    .chat-panel.open { transform:translateX(0); }
+
+    .chat-header {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:1rem 1.1rem;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      flex-shrink:0;
+    }
+    .chat-header-title {
+      font-size:0.875rem;font-weight:700;color:white;letter-spacing:-0.02em;
+      display:flex;align-items:center;gap:0.5rem;
+    }
+    #closeChatBtn {
+      background:none;border:none;cursor:pointer;
+      color:rgba(255,255,255,0.45);padding:4px;border-radius:6px;
+      display:flex;align-items:center;justify-content:center;
+      transition:color 0.15s,background 0.15s;
+    }
+    #closeChatBtn:hover { color:white;background:rgba(255,255,255,0.08); }
+
+    .chat-messages {
+      flex:1;overflow-y:auto;padding:0.75rem;
+      display:flex;flex-direction:column;gap:0.3rem;
+      scroll-behavior:smooth;
+    }
+    .chat-messages::-webkit-scrollbar { width:3px; }
+    .chat-messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12);border-radius:2px; }
+
+    .chat-divider {
+      text-align:center;color:rgba(255,255,255,0.25);font-size:0.65rem;
+      margin:0.4rem 0;letter-spacing:0.05em;
+    }
+
+    .chat-msg { display:flex;flex-direction:column;max-width:88%; }
+    .chat-msg.mine { align-self:flex-end;align-items:flex-end; }
+    .chat-msg.other { align-self:flex-start;align-items:flex-start; }
+
+    .chat-msg-sender {
+      font-size:0.7rem;font-weight:600;color:rgba(255,255,255,0.40);
+      margin-bottom:2px;padding:0 4px;
+    }
+    .chat-msg-bubble {
+      padding:0.6rem 0.9rem;border-radius:18px;
+      font-size:0.83rem;line-height:1.45;word-break:break-word;
+      max-width:100%;
+    }
+    .chat-msg.mine .chat-msg-bubble {
+      background:rgba(139,92,246,0.75);
+      border:1px solid rgba(139,92,246,0.40);
+      color:white;
+      border-bottom-right-radius:5px;
+    }
+    .chat-msg.other .chat-msg-bubble {
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.10);
+      color:rgba(255,255,255,0.88);
+      border-bottom-left-radius:5px;
+      backdrop-filter:blur(8px);
+    }
+    .chat-msg-time {
+      font-size:0.62rem;color:rgba(255,255,255,0.25);margin-top:3px;padding:0 4px;
+    }
+
+    .chat-input-wrap {
+      padding:0.75rem;
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;align-items:flex-end;gap:0.5rem;
+      flex-shrink:0;
+    }
+    #chatInput {
+      flex:1;background:rgba(255,255,255,0.07);
+      border:1px solid rgba(255,255,255,0.12);border-radius:14px;
+      color:white;font-family:inherit;font-size:0.82rem;
+      padding:0.6rem 0.8rem;resize:none;
+      max-height:100px;overflow-y:auto;line-height:1.4;
+      outline:none;transition:border-color 0.2s,box-shadow 0.2s;
+    }
+    #chatInput:focus { border-color:rgba(139,92,246,0.5);box-shadow:0 0 0 3px rgba(124,58,237,0.12); }
+    #chatInput::placeholder { color:rgba(255,255,255,0.22); }
+    #chatSendBtn {
+      width:36px;height:36px;border-radius:50%;flex-shrink:0;
+      background:white;
+      border:none;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:opacity 0.15s,transform 0.15s;
+    }
+    #chatSendBtn svg { stroke:#000; }
+    #chatSendBtn:hover { opacity:0.85;transform:scale(1.06); }
+    #chatSendBtn:active { transform:scale(0.94); }
+
+    .chat-empty {
+      flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:0.6rem;color:rgba(255,255,255,0.25);font-size:0.8rem;text-align:center;padding:2rem;
+    }
+    .chat-empty svg { opacity:0.25; }
+
+    @media (max-width: 640px) {
+      .chat-panel { width: 100vw; max-width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="call-layout">
+
+  <!-- ── TOPBAR ──────────────────────────────────────────── -->
+  <header class="topbar">
+
+    <!-- Left: Logo + Room -->
+    <div class="topbar-left">
+      <a href="/" class="topbar-logo">
+        <img src="/img/logo.png" alt="Clario" class="topbar-logo-img" />
+        <span>Clario</span>
+      </a>
+      <div class="room-badge">
+        Room:&nbsp;<span class="room-id-val" id="roomIdDisplay">—</span>
+        <button id="copyRoomBtn" title="Copy room link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center: Language selectors -->
+    <div class="topbar-center">
+      <div class="lang-selector">
+        <label>I Speak</label>
+        <select id="sourceLangSelect">
+          <option value="en">🇬🇧 EN</option>
+          <option value="hi">🇮🇳 HI</option>
+          <option value="es">🇪🇸 ES</option>
+          <option value="fr">🇫🇷 FR</option>
+          <option value="de">🇩🇪 DE</option>
+          <option value="zh">🇨🇳 ZH</option>
+          <option value="ar">🇸🇦 AR</option>
+          <option value="pt">🇧🇷 PT</option>
+          <option value="ja">🇯🇵 JA</option>
+          <option value="ko">🇰🇷 KO</option>
+        </select>
+      </div>
+      <div class="lang-selector">
+        <label>I Hear</label>
+        <select id="targetLangSelect">
+          <option value="en">🇬🇧 EN</option>
+          <option value="hi">🇮🇳 HI</option>
+          <option value="es">🇪🇸 ES</option>
+          <option value="fr">🇫🇷 FR</option>
+          <option value="de">🇩🇪 DE</option>
+          <option value="zh">🇨🇳 ZH</option>
+          <option value="ar">🇸🇦 AR</option>
+          <option value="pt">🇧🇷 PT</option>
+          <option value="ja">🇯🇵 JA</option>
+          <option value="ko">🇰🇷 KO</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Right: Mode buttons + theme toggle -->
+    <div class="topbar-right">
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="modeCaption">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="M7 15h3M14 15h3M7 11h2M12 11h5"/>
+          </svg>
+          Captions
+        </button>
+        <button class="mode-btn" id="modeDub">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+            <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+          </svg>
+          Audio
+        </button>
+        <button class="mode-btn" id="historyBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          History
+        </button>
+      </div>
+
+      <div class="topbar-sep"></div>
+
+      <!-- Theme toggle -->
+      <button class="theme-toggle" id="themeToggle" title="Toggle light / dark mode" aria-label="Toggle theme">
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── VIDEO GRID ────────────────────────────────────────── -->
+  <main class="video-grid-wrap">
+    <div class="video-grid count-1" id="videoGrid"></div>
+  </main>
+
+  <!-- ── LIVE CAPTION BAR ──────────────────────────────────── -->
+  <div class="live-caption-bar" id="liveCaptionBar">
+    <div class="caption-bar-speaker">
+      <div class="caption-bar-avatar" id="captionBarAvatar">?</div>
+      <span class="caption-bar-name" id="captionBarName"></span>
+    </div>
+    <p class="caption-bar-text" id="captionBarText"></p>
+  </div>
+
+  <!-- ── CONTROLS ──────────────────────────────────────────── -->
+  <footer class="controls">
+
+    <!-- Mic -->
+    <button class="ctrl-btn" id="btnMic">
+      <div class="ctrl-icon">
+        <svg class="mic-on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="9" y1="22" x2="15" y2="22"/>
+        </svg>
+        <svg class="mic-slash" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/>
+          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="9" y1="22" x2="15" y2="22"/>
+        </svg>
+      </div>
+      <span>Mic</span>
+    </button>
+
+    <!-- Camera -->
+    <button class="ctrl-btn" id="btnCam">
+      <div class="ctrl-icon">
+        <svg class="cam-on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="23 7 16 12 23 17 23 7"/>
+          <rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+        <svg class="cam-slash" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M7 7H4a2 2 0 0 0-2 2v9.5"/>
+          <path d="M9.5 4H16a2 2 0 0 1 2 2v7.5"/>
+          <path d="M16 16v1a2 2 0 0 1-2 2H6"/>
+          <polyline points="22 8 16 12 22 16"/>
+        </svg>
+      </div>
+      <span>Camera</span>
+    </button>
+
+    <!-- Screen share -->
+    <button class="ctrl-btn" id="btnShare" title="Share your screen">
+      <div class="ctrl-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <path d="M9 10l3-3 3 3M12 7v6"/>
+        </svg>
+      </div>
+      <span>Share</span>
+    </button>
+
+    <!-- Chat (with unread badge) -->
+    <div class="ctrl-btn-wrap">
+      <button class="ctrl-btn" id="btnChat">
+        <div class="ctrl-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <span>Chat</span>
+      </button>
+      <span class="chat-badge" id="chatBadge">0</span>
+    </div>
+
+    <!-- Participants -->
+    <button class="ctrl-btn" id="btnParticipants">
+      <div class="ctrl-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <span id="participantCount">1</span>
+    </button>
+
+    <!-- Leave -->
+    <button class="ctrl-btn danger" id="btnLeave">
+      <div class="ctrl-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07C9.44 16.29 7.62 14.48 6.29 12.4a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 5.4 1.59h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L9.38 9.5"/>
+          <line x1="23" y1="1" x2="1" y2="23"/>
+        </svg>
+      </div>
+      <span>Leave</span>
+    </button>
+
+  </footer>
+</div>
+
+<!-- ── SIDEBAR (participants) ───────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-title">Participants</div>
+  <div id="participantList"></div>
+</aside>
+
+<!-- ── CHAT PANEL ──────────────────────────────────────── -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <div class="chat-header-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Meeting Chat
+    </div>
+    <button id="closeChatBtn" title="Close chat">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-system-msg" style="text-align:center;font-size:0.68rem;color:var(--text-dim);padding:0.6rem 0.5rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.6"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Messages are end-to-end encrypted
+    </div>
+    <div class="chat-empty" id="chatEmpty">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span>No messages yet.<br>Say hi!</span>
+    </div>
+  </div>
+  <div class="chat-input-wrap">
+    <textarea id="chatInput" placeholder="Type a message…" rows="1"></textarea>
+    <button id="chatSendBtn" title="Send">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- ── CAPTION HISTORY PANEL (left slide-in) ─────────────── -->
+<div class="caption-panel" id="captionPanel">
+  <div class="caption-panel-header">
+    <div class="caption-panel-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <path d="M7 15h3M14 15h3M7 11h2M12 11h5"/>
+      </svg>
+      Live Captions
+    </div>
+    <button id="closeCaptionPanelBtn" title="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="caption-panel-list" id="captionPanelList">
+    <div class="cap-empty">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <path d="M7 15h3M14 15h3M7 11h2M12 11h5"/>
+      </svg>
+      <span>Captions will appear<br>when someone speaks</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── WAITING OVERLAY ─────────────────────────────────── -->
+<div class="waiting-overlay hidden" id="waitingOverlay">
+  <div class="waiting-card">
+    <div class="waiting-spinner"></div>
+    <h2>Waiting to be admitted</h2>
+    <p>The host will let you in shortly</p>
+    <div class="waiting-user-name">
+      <div class="waiting-user-avatar" id="waitingAvatar"></div>
+      <span id="waitingNameDisplay"></span>
+    </div>
+    <button id="waitingLeaveBtn">Leave</button>
+  </div>
+</div>
+
+<!-- ── REJECTED OVERLAY ───────────────────────────────── -->
+<div class="rejected-overlay hidden" id="rejectedOverlay">
+  <div class="rejected-card">
+    <div class="rejected-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="15" y1="9" x2="9" y2="15"/>
+        <line x1="9" y1="9" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <h2>Entry denied</h2>
+    <p>The host has declined your request to join this meeting.</p>
+    <button id="rejectedBackBtn">Back to Home</button>
+  </div>
+</div>
+
+<!-- ── ADMIT REQUEST STACK ─────────────────────────────── -->
+<div class="admit-stack" id="admitStack"></div>
+
+<!-- ── CAPTION HISTORY ─────────────────────────────────── -->
+<div class="caption-history" id="captionHistory"></div>
+
+<!-- ── TOAST ──────────────────────────────────────────── -->
+<div class="status-toast" id="statusToast"></div>
+
+<!-- Voice clone stubs (Phase 3 — disabled) -->
+<div id="voiceCloneDialog" style="display:none">
+  <button id="voiceCloneDecline"></button>
+  <button id="voiceCloneAccept"></button>
+</div>
+
+<!-- ── SCRIPTS ────────────────────────────────────────── -->
+<script type="module">
+import { SignalingClient } from '/js/signaling.js';
+import { PeerManager, AudioRecorder } from '/js/webrtc.js';
+import { CaptionManager } from '/js/captions.js';
+import { AudioDubManager } from '/js/audio.js';
+
+const params      = new URLSearchParams(location.search);
+const MY_NAME     = params.get('name')   || 'Guest';
+const SOURCE_LANG = params.get('source') || 'en';
+const TARGET_LANG = params.get('target') || 'en';
+const ROOM_ID     = params.get('room')   || 'default';
+
+let myId = null, localStream = null, micOn = true, camOn = true, isDub = false;
+let isWaiting = false;
+const participants = new Map();
+
+const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+const sig     = new SignalingClient(`${wsProto}://${location.host}/ws`);
+const capMgr  = new CaptionManager(document.getElementById('captionHistory'));
+const dubMgr  = new AudioDubManager();
+let peerMgr = null, recorder = null;
+
+const videoGrid  = document.getElementById('videoGrid');
+const sidebar    = document.getElementById('sidebar');
+const pList      = document.getElementById('participantList');
+const pCount     = document.getElementById('participantCount');
+const capHistory = document.getElementById('captionHistory');
+const toast_el   = document.getElementById('statusToast');
+const srcSel     = document.getElementById('sourceLangSelect');
+const tgtSel     = document.getElementById('targetLangSelect');
+
+srcSel.value = SOURCE_LANG;
+tgtSel.value = TARGET_LANG;
+
+/* ── helpers ──────────────────────────────────────────── */
+function toast(msg, ms = 3000) {
+  toast_el.textContent = msg;
+  toast_el.classList.add('show');
+  setTimeout(() => toast_el.classList.remove('show'), ms);
+}
+
+function gridClass() {
+  const n = videoGrid.children.length;
+  videoGrid.className = `video-grid count-${Math.min(n, 6)}`;
+  pCount.textContent = n;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function createTile(id, name, isLocal) {
+  const tile = document.createElement('div');
+  tile.id = `tile-${id}`;
+  tile.className = `video-tile${isLocal ? ' local-tile' : ''}`;
+  tile.innerHTML = `
+    <video id="vid-${id}" autoplay playsinline ${isLocal ? 'muted' : ''}></video>
+    <div class="tile-avatar" id="av-${id}">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v2h20v-2c0-3.33-6.67-5-10-5z"/>
+      </svg>
+    </div>
+    <div class="tile-translating" id="tr-${id}">
+      <div class="pulse-dot"></div>translating
+    </div>
+    <div class="tile-caption" id="cap-${id}"></div>
+    <div class="tile-name">
+      ${esc(name)}${isLocal ? '<span class="you-badge">YOU</span>' : ''}
+      <div class="tile-mic-off" id="mic-${id}">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </div>
+    </div>`;
+  videoGrid.appendChild(tile);
+  capMgr.registerTile(id, tile);
+  gridClass();
+}
+
+function removeTile(id) {
+  document.getElementById(`tile-${id}`)?.remove();
+  capMgr.unregisterTile(id);
+  gridClass();
+}
+
+function setStream(id, stream) {
+  const v = document.getElementById(`vid-${id}`);
+  const a = document.getElementById(`av-${id}`);
+  if (v && stream) {
+    v.srcObject = stream;
+    if (id !== myId) v.muted = isDub; // honour dub mode on join
+    a?.classList.add('hidden');
+    v.play().catch(() => {});
+  }
+}
+
+function setRemoteAudioMuted(muted) {
+  document.querySelectorAll('.video-tile:not(.local-tile) video')
+    .forEach(v => { v.muted = muted; });
+}
+
+// Pre-load voices so they're available instantly when needed
+let _voices = [];
+function _loadVoices() { _voices = window.speechSynthesis?.getVoices() || []; }
+_loadVoices();
+if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = _loadVoices;
+
+function _pickVoice(lang) {
+  // Exact match first (e.g. "hi-IN"), then prefix (e.g. "hi"), then any English, then null
+  return _voices.find(v => v.lang === lang)
+      || _voices.find(v => v.lang.startsWith(lang.split('-')[0]))
+      || _voices.find(v => v.lang.startsWith('en'))
+      || null;
+}
+
+// While TTS plays we must fully silence this device's mic:
+//  - recorder pause  → no STT chunks of our own TTS (stops rate-limit burn)
+//  - track disable   → WebRTC peers don't hear our TTS through the mic (stops echo/feedback loop)
+let _ttsPending = 0;
+
+function _silenceMic() {
+  recorder?.pause();
+  localStream?.getAudioTracks().forEach(t => t.enabled = false);
+}
+function _restoreMic() {
+  if (_ttsPending > 0) return; // more utterances still queued
+  setTimeout(() => {
+    if (_ttsPending > 0) return;
+    localStream?.getAudioTracks().forEach(t => t.enabled = micOn);
+    if (micOn) recorder?.resume();
+  }, 500); // let room acoustics settle before re-opening mic
+}
+
+function speakTranslation(text, lang) {
+  if (!window.speechSynthesis) return;
+
+  // Queue utterances instead of cancelling — cancelling mid-speech caused missing audio
+  _ttsPending++;
+  _silenceMic();
+
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  u.rate = 1.08;
+  const v = _pickVoice(lang);
+  if (v) u.voice = v;
+
+  // Safety timeout — if onend never fires (Chrome bug), force cleanup
+  const safetyMs = Math.max(4000, text.length * 80 + 1500);
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    _ttsPending = Math.max(0, _ttsPending - 1);
+    _restoreMic();
+  };
+
+  const safety = setTimeout(finish, safetyMs);
+  u.onend   = () => { clearTimeout(safety); finish(); };
+  u.onerror = () => { clearTimeout(safety); finish(); };
+
+  window.speechSynthesis.speak(u);
+}
+
+function renderPList() {
+  pList.innerHTML = '';
+  const self = document.createElement('div');
+  self.className = 'participant-item';
+  self.innerHTML = `
+    <div class="p-avatar">${MY_NAME[0].toUpperCase()}</div>
+    <div class="p-info">
+      <div class="p-name">${esc(MY_NAME)}<span class="p-you">YOU</span></div>
+      <div class="p-langs">${srcSel.value} → ${tgtSel.value}</div>
+    </div>`;
+  pList.appendChild(self);
+  participants.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'participant-item';
+    d.innerHTML = `
+      <div class="p-avatar">${p.name[0].toUpperCase()}</div>
+      <div class="p-info">
+        <div class="p-name">${esc(p.name)}</div>
+        <div class="p-langs">${p.sourceLang} → ${p.targetLang}</div>
+      </div>`;
+    pList.appendChild(d);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   WAITING ROOM
+══════════════════════════════════════════════════════════ */
+const waitingOverlay = document.getElementById('waitingOverlay');
+const rejectedOverlay = document.getElementById('rejectedOverlay');
+
+function showWaiting() {
+  isWaiting = true;
+  document.getElementById('waitingAvatar').textContent = MY_NAME[0].toUpperCase();
+  document.getElementById('waitingNameDisplay').textContent = MY_NAME;
+  waitingOverlay.classList.remove('hidden');
+}
+
+function hideWaiting() {
+  isWaiting = false;
+  waitingOverlay.classList.add('hidden');
+}
+
+document.getElementById('waitingLeaveBtn').addEventListener('click', () => {
+  sig.send('leave', {});
+  localStream?.getTracks().forEach(t => t.stop());
+  window.location.href = '/';
+});
+
+document.getElementById('rejectedBackBtn').addEventListener('click', () => {
+  window.location.href = '/';
+});
+
+/* ══════════════════════════════════════════════════════════
+   ADMIT REQUESTS (admin side)
+══════════════════════════════════════════════════════════ */
+const admitStack = document.getElementById('admitStack');
+
+function showAdmitCard(participantId, name) {
+  const card = document.createElement('div');
+  card.className = 'admit-card';
+  card.id = `admit-${participantId}`;
+  card.innerHTML = `
+    <div class="admit-card-top">
+      <div class="admit-avatar">${name[0].toUpperCase()}</div>
+      <div class="admit-info">
+        <div class="admit-name-text">${esc(name)}</div>
+        <div class="admit-sub">wants to join the meeting</div>
+      </div>
+    </div>
+    <div class="admit-btns">
+      <button class="admit-deny-btn">Deny</button>
+      <button class="admit-allow-btn">Admit</button>
+    </div>`;
+
+  card.querySelector('.admit-deny-btn').addEventListener('click', () => {
+    sig.send('admit', { participantId, admit: false });
+    card.remove();
+  });
+  card.querySelector('.admit-allow-btn').addEventListener('click', () => {
+    sig.send('admit', { participantId, admit: true });
+    card.remove();
+  });
+
+  admitStack.appendChild(card);
+  // Auto-dismiss after 60s
+  setTimeout(() => card.remove(), 60000);
+}
+
+/* ══════════════════════════════════════════════════════════
+   CHAT
+══════════════════════════════════════════════════════════ */
+const chatPanel   = document.getElementById('chatPanel');
+const chatMessages = document.getElementById('chatMessages');
+const chatEmpty   = document.getElementById('chatEmpty');
+const chatInput   = document.getElementById('chatInput');
+const chatBadge   = document.getElementById('chatBadge');
+let unreadCount   = 0;
+let chatOpen      = false;
+
+function openChat() {
+  chatOpen = true;
+  chatPanel.classList.add('open');
+  // close participants sidebar if open
+  sidebar.classList.remove('open');
+  unreadCount = 0;
+  chatBadge.classList.remove('has-unread');
+  chatBadge.textContent = '0';
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function closeChat() {
+  chatOpen = false;
+  chatPanel.classList.remove('open');
+}
+
+document.getElementById('btnChat').addEventListener('click', () =>
+  chatOpen ? closeChat() : openChat());
+document.getElementById('closeChatBtn').addEventListener('click', closeChat);
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function addChatMessage(senderId, senderName, text, ts) {
+  const isMine = senderId === myId;
+
+  // Remove empty state
+  chatEmpty?.remove();
+
+  const wrapper = document.createElement('div');
+  wrapper.className = `chat-msg ${isMine ? 'mine' : 'other'}`;
+  wrapper.innerHTML = `
+    ${!isMine ? `<div class="chat-msg-sender">${esc(senderName)}</div>` : ''}
+    <div class="chat-msg-bubble">${esc(text)}</div>
+    <div class="chat-msg-time">${formatTime(ts)}</div>`;
+  chatMessages.appendChild(wrapper);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  if (!isMine && !chatOpen) {
+    unreadCount++;
+    chatBadge.textContent = unreadCount;
+    chatBadge.classList.add('has-unread');
+  }
+}
+
+function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  sig.send('chat_message', { text });
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+}
+
+document.getElementById('chatSendBtn').addEventListener('click', sendChat);
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+});
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+});
+
+/* ══════════════════════════════════════════════════════════
+   SIGNALING EVENTS
+══════════════════════════════════════════════════════════ */
+sig.addEventListener('waiting', ({ detail: msg }) => {
+  myId = msg.participantId;
+  showWaiting();
+  toast('Waiting for host to admit you…', 8000);
+});
+
+sig.addEventListener('rejected', () => {
+  hideWaiting();
+  rejectedOverlay.classList.remove('hidden');
+});
+
+sig.addEventListener('joined', async ({ detail: msg }) => {
+  hideWaiting();
+  myId = msg.participantId;
+  toast(`Joined room ${ROOM_ID}`);
+  for (const p of (msg.participants || [])) {
+    participants.set(p.id, p);
+    createTile(p.id, p.name, false);
+    await peerMgr.callParticipant(p.id);
+  }
+  renderPList();
+
+  // Start recording after being admitted
+  if (localStream && !recorder) {
+    recorder = new AudioRecorder(localStream, (b64, mimeType) => {
+      sig.send('audio_chunk', { sourceLang: srcSel.value, mimeType, data: b64 });
+    }, 6000);
+    recorder.start();
+  }
+});
+
+sig.addEventListener('participant_joined', async ({ detail: msg }) => {
+  const p = msg.participant;
+  if (p.id === myId) return;
+  participants.set(p.id, p);
+  createTile(p.id, p.name, false);
+  toast(`${p.name} joined`);
+  renderPList();
+});
+
+sig.addEventListener('participant_left', ({ detail: msg }) => {
+  const p = participants.get(msg.participantId);
+  if (p) toast(`${p.name} left`);
+  participants.delete(msg.participantId);
+  peerMgr.removePeer(msg.participantId);
+  removeTile(msg.participantId);
+  renderPList();
+});
+
+sig.addEventListener('admit_request', ({ detail: msg }) => {
+  showAdmitCard(msg.participantId, msg.name);
+  toast(`${msg.name} is waiting to join`, 8000);
+});
+
+sig.addEventListener('chat_message', ({ detail: msg }) => {
+  addChatMessage(msg.senderId, msg.senderName, msg.text, msg.ts);
+});
+
+sig.addEventListener('offer',  async ({ detail: m }) => await peerMgr.handleOffer(m.senderId, m.data));
+sig.addEventListener('answer', async ({ detail: m }) => await peerMgr.handleAnswer(m.senderId, m.data));
+sig.addEventListener('ice',    async ({ detail: m }) => await peerMgr.handleICE(m.senderId, m.data));
+
+sig.addEventListener('caption',    ({ detail: m }) => {
+  if (captionsEnabled) capMgr.showCaption(m.speakerId, m.speakerName, m.text, m.isFinal);
+  if (isDub && m.speakerId !== myId) speakTranslation(m.text, tgtSel.value);
+});
+sig.addEventListener('translating',({ detail: m }) => capMgr.setTranslating(m.speakerId, m.active));
+sig.addEventListener('audio_dub',  () => { /* handled by Web Speech API in dub mode */ });
+
+/* ── Controls ────────────────────────────────────────── */
+const btnMic = document.getElementById('btnMic');
+const btnCam = document.getElementById('btnCam');
+
+btnMic.addEventListener('click', () => {
+  micOn = !micOn;
+  localStream?.getAudioTracks().forEach(t => t.enabled = micOn);
+  micOn ? recorder?.resume() : recorder?.pause();
+  btnMic.classList.toggle('off', !micOn);
+  // Show mic-off indicator on local tile
+  document.getElementById('mic-local')?.classList.toggle('show', !micOn);
+});
+
+btnCam.addEventListener('click', () => {
+  camOn = !camOn;
+  localStream?.getVideoTracks().forEach(t => t.enabled = camOn);
+  btnCam.classList.toggle('off', !camOn);
+});
+
+document.getElementById('btnParticipants').addEventListener('click', () => {
+  closeChat();
+  sidebar.classList.toggle('open');
+});
+
+/* ── Screen share ─────────────────────────────────────── */
+const btnShare = document.getElementById('btnShare');
+let screenStream = null;
+
+function stopShare() {
+  if (!screenStream) return;
+  screenStream.getTracks().forEach(t => t.stop());
+  screenStream = null;
+  // Restore camera track to peers + local preview
+  const camTrack = localStream?.getVideoTracks()[0];
+  if (camTrack) peerMgr?.replaceVideoTrack(camTrack);
+  const v = document.getElementById('vid-local');
+  if (v && localStream) v.srcObject = localStream;
+  document.getElementById('tile-local')?.classList.remove('sharing');
+  btnShare.classList.remove('active');
+  toast('Screen sharing stopped');
+}
+
+btnShare.addEventListener('click', async () => {
+  if (screenStream) { stopShare(); return; }
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    toast('Screen share not supported on this device');
+    return;
+  }
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 15 }, audio: false,
+    });
+  } catch { return; /* user cancelled the picker */ }
+
+  const track = screenStream.getVideoTracks()[0];
+  peerMgr?.replaceVideoTrack(track);
+
+  // Show the screen in our local tile (unmirrored)
+  const v = document.getElementById('vid-local');
+  if (v) v.srcObject = screenStream;
+  document.getElementById('tile-local')?.classList.add('sharing');
+
+  track.onended = stopShare; // browser "Stop sharing" button
+  btnShare.classList.add('active');
+  toast('Sharing your screen');
+});
+
+document.getElementById('btnLeave').addEventListener('click', () => {
+  stopShare();
+  sig.send('leave', {});
+  recorder?.stop();
+  peerMgr?.closeAll();
+  localStream?.getTracks().forEach(t => t.stop());
+  dubMgr.cleanup();
+  window.location.href = '/';
+});
+
+document.getElementById('copyRoomBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(`${location.origin}/call.html?room=${ROOM_ID}`)
+    .then(() => toast('Room link copied!'));
+});
+
+// historyBtn wired below after capMgr initialisation
+
+let captionsEnabled = true;
+
+document.getElementById('modeCaption').addEventListener('click', () => {
+  isDub = false;
+  setRemoteAudioMuted(false);
+  window.speechSynthesis?.cancel();
+  captionsEnabled = !captionsEnabled;
+  document.getElementById('modeCaption').classList.toggle('active', captionsEnabled);
+  document.getElementById('modeDub').classList.remove('active');
+  if (!captionsEnabled) capMgr.hideBar();
+});
+
+document.getElementById('modeDub').addEventListener('click', () => {
+  isDub = true;
+  setRemoteAudioMuted(true);
+  captionsEnabled = false;
+  document.getElementById('modeDub').classList.add('active');
+  document.getElementById('modeCaption').classList.remove('active');
+  capMgr.hideBar();
+  toast('Dubbed audio — original muted, translated voice will play');
+});
+
+// Caption panel toggle
+document.getElementById('historyBtn').addEventListener('click', () => {
+  capMgr.togglePanel();
+  document.getElementById('captionHistory').classList.remove('visible'); // hide old
+});
+document.getElementById('closeCaptionPanelBtn').addEventListener('click', () => capMgr.closePanel());
+
+srcSel.addEventListener('change', () =>
+  sig.send('lang_change', { sourceLang: srcSel.value, targetLang: tgtSel.value }));
+tgtSel.addEventListener('change', () =>
+  sig.send('lang_change', { sourceLang: srcSel.value, targetLang: tgtSel.value }));
+
+document.getElementById('voiceCloneDecline').addEventListener('click', () => {});
+document.getElementById('voiceCloneAccept').addEventListener('click', () => {});
+
+/* ── Boot ───────────────────────────────────────────── */
+async function boot() {
+  document.getElementById('roomIdDisplay').textContent = ROOM_ID;
+  document.title = `${ROOM_ID} — Clario`;
+
+  const audioC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: audioC, video: true });
+  } catch {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioC, video: false });
+      toast('Camera unavailable — audio only');
+    } catch {
+      toast('Microphone denied — translation disabled', 6000);
+    }
+  }
+
+  createTile('local', MY_NAME, true);
+  if (localStream) setStream('local', localStream);
+
+  await sig.connect();
+
+  peerMgr = new PeerManager(sig, localStream,
+    (id, stream) => {
+      if (!document.getElementById(`tile-${id}`)) {
+        createTile(id, participants.get(id)?.name || 'Participant', false);
+      }
+      setStream(id, stream);
+    },
+    (id) => removeTile(id)
+  );
+  await peerMgr.loadICEConfig();
+
+  sig.send('join', { roomId: ROOM_ID, name: MY_NAME, targetLang: tgtSel.value, sourceLang: srcSel.value });
+
+  // Recording starts after 'joined' (handles both first-joiner and admitted cases)
+  // For the first joiner, 'joined' fires immediately, so recorder starts then.
+}
+
+boot().catch(err => { console.error(err); toast('Error: ' + err.message, 8000); });
+
+/* ── Theme toggle ─────────────────────────────────────────── */
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const isLight = document.documentElement.classList.toggle('light');
+  localStorage.setItem('pm-theme', isLight ? 'light' : 'dark');
+});
+</script>
+
+</body>
+</html>

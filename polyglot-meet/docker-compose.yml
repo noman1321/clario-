@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADDR: ":8080"
+      GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      GROQ_API_KEY: "${GROQ_API_KEY}"
+      TURN_HOST: "${TURN_HOST:-}"
+      TURN_PORT: "${TURN_PORT:-3478}"
+      TURN_USER: "${TURN_USER:-polyglot}"
+      TURN_PASS: "${TURN_PASS:-polyglot123}"
+      STT_MODEL: "${STT_MODEL:-whisper-large-v3-turbo}"
+      TRANS_MODEL: "${TRANS_MODEL:-llama-3.3-70b-versatile}"
+      TTS_MODEL: "${TTS_MODEL:-gemini-2.5-flash-preview-tts}"
+      FRONTEND_PATH: "/frontend"
+    volumes:
+      - ./frontend:/frontend:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
