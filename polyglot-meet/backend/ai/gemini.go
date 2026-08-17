@@ -37,10 +37,18 @@ func NewGeminiProvider(apiKey, sttModel, transModel, ttsModel string) (*GeminiPr
 		client:     client,
 		apiKey:     apiKey,
 		sttModel:   sttModel,
-		transModel: transModel,
+		transModel: resolveGeminiTransModel(transModel),
 		ttsModel:   ttsModel,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: &http.Client{Timeout: 20 * time.Second},
 	}, nil
+}
+
+func resolveGeminiTransModel(name string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if strings.HasPrefix(n, "gemini") && !strings.Contains(n, "tts") {
+		return name
+	}
+	return "gemini-2.5-flash"
 }
 
 func (g *GeminiProvider) Transcribe(ctx context.Context, audioData []byte, mimeType, lang string) (string, error) {
@@ -99,27 +107,22 @@ func cleanTranscript(raw string) string {
 }
 
 func (g *GeminiProvider) Translate(ctx context.Context, text, sourceLang, targetLang string) (string, error) {
-	if strings.TrimSpace(text) == "" || sourceLang == targetLang {
+	text = strings.TrimSpace(text)
+	if text == "" || sourceLang == targetLang {
 		return text, nil
 	}
 	model := g.client.GenerativeModel(g.transModel)
-	temp := float32(0.1)
+	temp := float32(0)
 	model.Temperature = &temp
-
-	prompt := fmt.Sprintf(`Translate the following text from %s to %s.
-
-Rules:
-- Return ONLY the translated text, nothing else
-- Keep the same meaning and tone
-- Do NOT add notes, explanations, or alternatives
-- Do NOT translate proper names
-
-Text: %s`, LangName(sourceLang), LangName(targetLang), text)
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return text, fmt.Errorf("gemini translate: %w", err)
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(interpreterSystem(sourceLang, targetLang))},
 	}
-	result := strings.TrimSpace(extractText(resp))
+
+	resp, err := model.GenerateContent(ctx, genai.Text(text))
+	if err != nil {
+		return "", fmt.Errorf("gemini translate: %w", err)
+	}
+	result := cleanTranslation(extractText(resp))
 	if result == "" {
 		return text, nil
 	}

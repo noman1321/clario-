@@ -1,25 +1,30 @@
 export class CaptionManager {
   constructor(historyEl) {
-    // historyEl kept for compatibility but we primarily use the new panel
     this.historyEl = historyEl;
     this.tileMap   = new Map();
     this.timers    = new Map();
 
-    // New: live caption bar elements
     this._bar      = document.getElementById('liveCaptionBar');
     this._barText  = document.getElementById('captionBarText');
     this._barName  = document.getElementById('captionBarName');
     this._barAvatar= document.getElementById('captionBarAvatar');
     this._barTimer = null;
 
-    // New: caption history panel
     this._panel    = document.getElementById('captionPanel');
     this._panelList= document.getElementById('captionPanelList');
     this._lastSpeaker = null;
+    this._barSpeaker  = null;
+    this._barParts    = [];
+    this.liveEnabled  = true; // live overlay; history always records
   }
 
   registerTile(id, tileEl)   { this.tileMap.set(id, tileEl); }
   unregisterTile(id)         { this.tileMap.delete(id); }
+
+  setLiveEnabled(on) {
+    this.liveEnabled = !!on;
+    if (!on) this.hideBar();
+  }
 
   setTranslating(speakerId, active) {
     const tile = this.tileMap.get(speakerId);
@@ -30,12 +35,14 @@ export class CaptionManager {
   }
 
   showCaption(speakerId, speakerName, text, isFinal) {
-    // 1. Update live caption bar (big, always visible)
-    this._showBar(speakerName, text);
+    if (!text) return;
 
-    // 2. Update tile overlay (secondary, small)
+    // 1. Live caption bar (when enabled)
+    if (this.liveEnabled) this._showBar(speakerName, text);
+
+    // 2. Tile overlay
     const tile = this.tileMap.get(speakerId);
-    if (tile) {
+    if (tile && this.liveEnabled) {
       const el = tile.querySelector('.tile-caption');
       if (el) {
         el.textContent = text;
@@ -49,36 +56,50 @@ export class CaptionManager {
               el.classList.remove('show', 'caption-fade-out');
               el.textContent = '';
             }, 800);
-          }, 3000));
+          }, 4000));
         }
       }
     }
 
-    // 3. Add to scrollable caption panel on final
-    if (isFinal && text) this._addPanelEntry(speakerName, text);
+    // 3. History always gets finals (even in Audio/dub mode)
+    if (isFinal) this._addPanelEntry(speakerName, text);
   }
 
-  // ── Live Caption Bar ──────────────────────────────────────
   _showBar(name, text) {
     if (!this._bar || !this._barText) return;
-    this._barText.textContent  = text;
+
+    // Append consecutive lines from same speaker so captions read as speech
+    if (name === this._barSpeaker && this._barParts.length) {
+      const last = this._barParts[this._barParts.length - 1];
+      if (last !== text) this._barParts.push(text);
+      // Keep last 2 phrases visible for context
+      if (this._barParts.length > 2) this._barParts = this._barParts.slice(-2);
+      this._barText.textContent = this._barParts.join(' ');
+    } else {
+      this._barSpeaker = name;
+      this._barParts = [text];
+      this._barText.textContent = text;
+    }
+
     this._barName.textContent  = name;
     this._barAvatar.textContent = name[0]?.toUpperCase() || '?';
     this._bar.classList.add('visible');
 
-    // Auto-hide after 5s of no new caption
     clearTimeout(this._barTimer);
     this._barTimer = setTimeout(() => {
       this._bar.classList.remove('visible');
-    }, 5000);
+      this._barSpeaker = null;
+      this._barParts = [];
+    }, 7000);
   }
 
   hideBar() {
     clearTimeout(this._barTimer);
     this._bar?.classList.remove('visible');
+    this._barSpeaker = null;
+    this._barParts = [];
   }
 
-  // ── Caption History Panel ─────────────────────────────────
   openPanel()  { this._panel?.classList.add('open'); }
   closePanel() { this._panel?.classList.remove('open'); }
   togglePanel(){ this._panel?.classList.toggle('open'); }
@@ -86,15 +107,12 @@ export class CaptionManager {
   _addPanelEntry(name, text) {
     if (!this._panelList) return;
 
-    // Remove empty state if present
     this._panelList.querySelector('.cap-empty')?.remove();
 
     const now   = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Group consecutive messages from same speaker
     if (name === this._lastSpeaker) {
-      // Append to existing group
       const lastGroup = this._panelList.querySelector('.cap-group:last-child');
       if (lastGroup) {
         const bubble = document.createElement('div');
@@ -107,7 +125,6 @@ export class CaptionManager {
       }
     }
 
-    // New speaker group
     this._lastSpeaker = name;
     const group = document.createElement('div');
     group.className = 'cap-group';
@@ -123,12 +140,10 @@ export class CaptionManager {
     this._panelList.appendChild(group);
     this._panelList.scrollTop = this._panelList.scrollHeight;
 
-    // Cap at 100 groups
     while (this._panelList.querySelectorAll('.cap-group').length > 100) {
       this._panelList.querySelector('.cap-group')?.remove();
     }
 
-    // Also keep old history panel in sync
     if (this.historyEl) {
       const item = document.createElement('div');
       item.className = 'cap-line';
@@ -140,4 +155,4 @@ export class CaptionManager {
   }
 }
 
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

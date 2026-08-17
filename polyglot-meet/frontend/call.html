@@ -738,7 +738,9 @@ function setStream(id, stream) {
   const a = document.getElementById(`av-${id}`);
   if (v && stream) {
     v.srcObject = stream;
-    if (id !== myId) v.muted = isDub; // honour dub mode on join
+    // Local preview must always stay muted — otherwise you hear your own mic.
+    const isLocal = id === 'local' || id === myId;
+    v.muted = isLocal ? true : isDub;
     a?.classList.add('hidden');
     v.play().catch(() => {});
   }
@@ -755,11 +757,23 @@ function _loadVoices() { _voices = window.speechSynthesis?.getVoices() || []; }
 _loadVoices();
 if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = _loadVoices;
 
+const TTS_LANG = {
+  en: 'en-US', hi: 'hi-IN', es: 'es-ES', fr: 'fr-FR', de: 'de-DE',
+  zh: 'zh-CN', ar: 'ar-SA', pt: 'pt-BR', ja: 'ja-JP', ko: 'ko-KR',
+};
+
+function _ttsLocale(lang) {
+  if (!lang) return 'en-US';
+  if (lang.includes('-')) return lang;
+  return TTS_LANG[lang] || lang;
+}
+
 function _pickVoice(lang) {
-  // Exact match first (e.g. "hi-IN"), then prefix (e.g. "hi"), then any English, then null
-  return _voices.find(v => v.lang === lang)
-      || _voices.find(v => v.lang.startsWith(lang.split('-')[0]))
-      || _voices.find(v => v.lang.startsWith('en'))
+  const locale = _ttsLocale(lang);
+  const prefix = locale.split('-')[0];
+  return _voices.find(v => v.lang === locale)
+      || _voices.find(v => v.lang.replace('_', '-').toLowerCase() === locale.toLowerCase())
+      || _voices.find(v => v.lang.startsWith(prefix))
       || null;
 }
 
@@ -773,38 +787,56 @@ function _silenceMic() {
   localStream?.getAudioTracks().forEach(t => t.enabled = false);
 }
 function _restoreMic() {
-  if (_ttsPending > 0) return; // more utterances still queued
+  if (_ttsPending > 0) return;
   setTimeout(() => {
     if (_ttsPending > 0) return;
     localStream?.getAudioTracks().forEach(t => t.enabled = micOn);
     if (micOn) recorder?.resume();
-  }, 500); // let room acoustics settle before re-opening mic
+  }, 350);
+}
+
+function _isPromptLeak(text) {
+  const t = (text || '').toLowerCase();
+  return /ignore background|transcribe only|live conversation|background noise|background voice|clear speech/.test(t);
 }
 
 function speakTranslation(text, lang) {
-  if (!window.speechSynthesis) return;
+  if (!window.speechSynthesis || !text?.trim() || _isPromptLeak(text)) return;
 
-  // Queue utterances instead of cancelling — cancelling mid-speech caused missing audio
   _ttsPending++;
   _silenceMic();
 
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang;
-  u.rate = 1.08;
-  const v = _pickVoice(lang);
-  if (v) u.voice = v;
+  const locale = _ttsLocale(lang);
+  const u = new SpeechSynthesisUtterance(text.trim());
+  u.lang = locale;
+  u.rate = 1.0;
+  const v = _pickVoice(locale);
+  if (v) {
+    u.voice = v;
+    u.lang = v.lang;
+  }
 
-  // Safety timeout — if onend never fires (Chrome bug), force cleanup
-  const safetyMs = Math.max(4000, text.length * 80 + 1500);
+  // Chrome often pauses mid-utterance; keep it alive until onend.
+  const keepAlive = setInterval(() => {
+    if (window.speechSynthesis.speaking && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+  }, 250);
+
+  const safetyMs = Math.max(8000, text.trim().length * 120 + 2500);
   let done = false;
   const finish = () => {
     if (done) return;
     done = true;
+    clearInterval(keepAlive);
     _ttsPending = Math.max(0, _ttsPending - 1);
     _restoreMic();
   };
 
-  const safety = setTimeout(finish, safetyMs);
+  const safety = setTimeout(() => {
+    if (window.speechSynthesis.speaking) return; // still playing — wait for onend
+    finish();
+  }, safetyMs);
   u.onend   = () => { clearTimeout(safety); finish(); };
   u.onerror = () => { clearTimeout(safety); finish(); };
 
@@ -1006,7 +1038,7 @@ sig.addEventListener('joined', async ({ detail: msg }) => {
   if (localStream && !recorder) {
     recorder = new AudioRecorder(localStream, (b64, mimeType) => {
       sig.send('audio_chunk', { sourceLang: srcSel.value, mimeType, data: b64 });
-    }, 6000);
+    }, 7000);
     recorder.start();
   }
 });
@@ -1043,8 +1075,18 @@ sig.addEventListener('answer', async ({ detail: m }) => await peerMgr.handleAnsw
 sig.addEventListener('ice',    async ({ detail: m }) => await peerMgr.handleICE(m.senderId, m.data));
 
 sig.addEventListener('caption',    ({ detail: m }) => {
-  if (captionsEnabled) capMgr.showCaption(m.speakerId, m.speakerName, m.text, m.isFinal);
-  if (isDub && m.speakerId !== myId) speakTranslation(m.text, tgtSel.value);
+  if (_isPromptLeak(m.text)) return;
+  capMgr.showCaption(m.speakerId, m.speakerName, m.text, m.isFinal);
+  if (!isDub || m.speakerId === myId) return;
+
+  const sameLang = m.sourceLang && m.sourceLang === tgtSel.value;
+  const vid = document.getElementById(`vid-${m.speakerId}`);
+  if (sameLang) {
+    if (vid) vid.muted = false; // already in listener's language — play original
+    return;
+  }
+  if (vid) vid.muted = true;
+  speakTranslation(m.text, tgtSel.value);
 });
 sig.addEventListener('translating',({ detail: m }) => capMgr.setTranslating(m.speakerId, m.active));
 sig.addEventListener('audio_dub',  () => { /* handled by Web Speech API in dub mode */ });
@@ -1134,25 +1176,37 @@ document.getElementById('copyRoomBtn').addEventListener('click', () => {
 // historyBtn wired below after capMgr initialisation
 
 let captionsEnabled = true;
+capMgr.setLiveEnabled(true);
 
 document.getElementById('modeCaption').addEventListener('click', () => {
-  isDub = false;
-  setRemoteAudioMuted(false);
-  window.speechSynthesis?.cancel();
   captionsEnabled = !captionsEnabled;
   document.getElementById('modeCaption').classList.toggle('active', captionsEnabled);
-  document.getElementById('modeDub').classList.remove('active');
-  if (!captionsEnabled) capMgr.hideBar();
+  capMgr.setLiveEnabled(captionsEnabled);
+  if (!captionsEnabled) {
+    toast('Live captions hidden — open History anytime');
+  } else {
+    toast('Live captions on');
+  }
 });
 
 document.getElementById('modeDub').addEventListener('click', () => {
-  isDub = true;
-  setRemoteAudioMuted(true);
-  captionsEnabled = false;
-  document.getElementById('modeDub').classList.add('active');
-  document.getElementById('modeCaption').classList.remove('active');
-  capMgr.hideBar();
-  toast('Dubbed audio — original muted, translated voice will play');
+  isDub = !isDub;
+  document.getElementById('modeDub').classList.toggle('active', isDub);
+  setRemoteAudioMuted(isDub);
+  if (!isDub) {
+    window.speechSynthesis?.cancel();
+    _ttsPending = 0;
+    _restoreMic();
+    toast('Original audio restored');
+  } else {
+    // Keep captions available with dubbed audio — that's how Teams-style CC works
+    if (!captionsEnabled) {
+      captionsEnabled = true;
+      document.getElementById('modeCaption').classList.add('active');
+      capMgr.setLiveEnabled(true);
+    }
+    toast('Translated audio on — original muted');
+  }
 });
 
 // Caption panel toggle

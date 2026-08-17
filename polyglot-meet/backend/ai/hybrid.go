@@ -2,14 +2,14 @@ package ai
 
 import "context"
 
-// HybridProvider routes STT+Translation to Groq and TTS to Gemini.
+// HybridProvider: Groq Whisper for STT, Gemini Flash for translation, Gemini for TTS.
 type HybridProvider struct {
-	stt   *GroqProvider
-	tts   *GeminiProvider
+	stt    *GroqProvider
+	gemini *GeminiProvider
 }
 
 func NewHybridProvider(groq *GroqProvider, gemini *GeminiProvider) *HybridProvider {
-	return &HybridProvider{stt: groq, tts: gemini}
+	return &HybridProvider{stt: groq, gemini: gemini}
 }
 
 func (h *HybridProvider) Transcribe(ctx context.Context, audioData []byte, mimeType, lang string) (string, error) {
@@ -17,9 +17,13 @@ func (h *HybridProvider) Transcribe(ctx context.Context, audioData []byte, mimeT
 }
 
 func (h *HybridProvider) Translate(ctx context.Context, text, sourceLang, targetLang string) (string, error) {
+	out, err := h.gemini.Translate(ctx, text, sourceLang, targetLang)
+	if err == nil && out != "" {
+		return out, nil
+	}
 	return h.stt.Translate(ctx, text, sourceLang, targetLang)
 }
 
 func (h *HybridProvider) Synthesize(ctx context.Context, text, lang, voiceID string) ([]byte, string, error) {
-	return h.tts.Synthesize(ctx, text, lang, voiceID)
+	return h.gemini.Synthesize(ctx, text, lang, voiceID)
 }

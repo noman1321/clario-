@@ -98,12 +98,14 @@ export class AudioRecorder {
     this.onChunk     = onChunk;
     this.maxDuration = maxDurationMs; // hard cap per segment
 
-    // VAD tuning
-    this.SILENCE_MS  = 700;   // ms of quiet → end of utterance
-    this.THRESHOLD   = 0.018; // RMS amplitude (0–1); raise if noisy room
-    this.MIN_BYTES   = 6000;  // skip chunks smaller than this (~0.4s of webm audio)
-    this.MIN_GAP_MS  = 2500;  // min gap between sends — Groq free tier is 20 req/min
+    // VAD tuning — longer silence = fuller phrases = better translation
+    this.SILENCE_MS  = 850;   // wait for a real pause so phrases stay whole
+    this.THRESHOLD   = 0.022; // RMS amplitude (0–1); raise if noisy room
+    this.MIN_BYTES   = 8000;  // skip tiny chunks (noise / coughs)
+    this.MIN_GAP_MS  = 2500;  // Groq free tier ~20 RPM
     this._lastSend   = 0;
+    this._queue      = [];    // FIFO — do not drop earlier speech
+    this._flushTimer = null;
 
     this._running      = false;
     this._paused       = false;
@@ -170,11 +172,8 @@ export class AudioRecorder {
       if (saved.length === 0) return;
       const blob  = new Blob(saved, { type: this.mimeType || 'audio/webm' });
       const bytes = new Uint8Array(await blob.arrayBuffer());
-      const now   = Date.now();
-      if (bytes.length >= this.MIN_BYTES && (now - this._lastSend) >= this.MIN_GAP_MS) {
-        this._lastSend = now;
-        this.onChunk(this._toB64(bytes), this.mimeType || 'audio/webm');
-      }
+      if (bytes.length < this.MIN_BYTES) return;
+      this._enqueue(this._toB64(bytes), this.mimeType || 'audio/webm');
     };
     // collect data every 100ms so we get data even on short utterances
     this._rec.start(100);
@@ -184,6 +183,33 @@ export class AudioRecorder {
     if (this._rec && this._rec.state === 'recording') {
       this._rec.stop();
     }
+  }
+
+  _enqueue(b64, mime) {
+    this._queue.push({ b64, mime });
+    if (this._queue.length > 3) this._queue.shift();
+    this._scheduleFlush();
+  }
+
+  _scheduleFlush() {
+    if (this._flushTimer) return;
+    const wait = Math.max(0, this.MIN_GAP_MS - (Date.now() - this._lastSend));
+    this._flushTimer = setTimeout(() => {
+      this._flushTimer = null;
+      this._flush();
+    }, wait);
+  }
+
+  _flush() {
+    if (!this._queue.length) return;
+    if ((Date.now() - this._lastSend) < this.MIN_GAP_MS) {
+      this._scheduleFlush();
+      return;
+    }
+    const { b64, mime } = this._queue.shift();
+    this._lastSend = Date.now();
+    this.onChunk(b64, mime);
+    if (this._queue.length) this._scheduleFlush();
   }
 
   _vadTick() {

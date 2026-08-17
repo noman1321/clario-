@@ -22,7 +22,7 @@ func main() {
 	if cfg.GroqAPIKey != "" {
 		groq := ai.NewGroqProvider(cfg.GroqAPIKey, cfg.STTModel, cfg.TransModel)
 		provider = ai.NewHybridProvider(groq, gemini)
-		log.Printf("[ai] using Groq for STT+Translation, Gemini for TTS")
+		log.Printf("[ai] using Groq Whisper for STT, Gemini Flash for translation, Gemini for TTS")
 	} else {
 		provider = gemini
 		log.Printf("[ai] using Gemini for all AI tasks")

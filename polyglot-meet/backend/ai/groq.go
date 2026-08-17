@@ -27,7 +27,7 @@ func NewGroqProvider(apiKey, sttModel, transModel string) *GroqProvider {
 		apiKey:     apiKey,
 		sttModel:   sttModel,
 		transModel: transModel,
-		client:     &http.Client{},
+		client:     &http.Client{Timeout: 45 * time.Second},
 	}
 }
 
@@ -49,6 +49,7 @@ func (g *GroqProvider) Transcribe(ctx context.Context, audioData []byte, mimeTyp
 	_ = w.WriteField("model", g.sttModel)
 	_ = w.WriteField("response_format", "json")
 	_ = w.WriteField("temperature", "0")
+	// Language only — Whisper "prompt" is treated as prior transcript and gets spoken back.
 	if lang != "" && lang != "auto" {
 		_ = w.WriteField("language", lang)
 	}
@@ -98,8 +99,7 @@ func (g *GroqProvider) Transcribe(ctx context.Context, audioData []byte, mimeTyp
 		return "", fmt.Errorf("groq stt parse: %w", err)
 	}
 
-	text := strings.TrimSpace(result.Text)
-	return text, nil
+	return sanitizeTranscript(result.Text), nil
 }
 
 func retryAfter(header string, fallback time.Duration) time.Duration {
@@ -111,20 +111,22 @@ func retryAfter(header string, fallback time.Duration) time.Duration {
 	return fallback
 }
 
-// Translate uses Groq Llama chat completions.
+// Translate uses Groq Llama as a simultaneous interpreter.
 func (g *GroqProvider) Translate(ctx context.Context, text, sourceLang, targetLang string) (string, error) {
-	prompt := fmt.Sprintf(
-		"Translate the following %s text to %s.\nReturn ONLY the translated text. No notes, no explanations, no alternatives.\n\nText: %s",
-		LangName(sourceLang), LangName(targetLang), text,
-	)
+	text = strings.TrimSpace(text)
+	if text == "" || sourceLang == targetLang {
+		return text, nil
+	}
 
 	payload := map[string]any{
 		"model": g.transModel,
 		"messages": []map[string]string{
-			{"role": "user", "content": prompt},
+			{"role": "system", "content": interpreterSystem(sourceLang, targetLang)},
+			{"role": "user", "content": text},
 		},
-		"temperature": 0.1,
-		"max_tokens":  512,
+		"temperature": 0.0,
+		"max_tokens":  220,
+		"top_p":       1,
 	}
 
 	b, _ := json.Marshal(payload)
@@ -159,7 +161,12 @@ func (g *GroqProvider) Translate(ctx context.Context, text, sourceLang, targetLa
 	if len(result.Choices) == 0 {
 		return "", fmt.Errorf("groq translate: no choices")
 	}
-	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+
+	out := cleanTranslation(result.Choices[0].Message.Content)
+	if out == "" {
+		return text, nil
+	}
+	return out, nil
 }
 
 // Synthesize is not implemented on GroqProvider — use HybridProvider.

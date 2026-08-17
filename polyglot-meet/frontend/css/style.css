@@ -825,24 +825,34 @@ select option { background: #1a1a2e; color: var(--text); }
    LIVE CAPTION BAR  (glass overlay)
    ═══════════════════════════════════════════════ */
 .live-caption-bar {
-  flex-shrink: 0;
+  position: fixed;
+  left: 50%;
+  bottom: 5.75rem;
+  transform: translateX(-50%) translateY(12px);
+  width: min(760px, calc(100vw - 1.5rem));
+  z-index: 35;
   display: none;
   align-items: flex-start;
-  gap: 1rem;
-  padding: 0.9rem 1.5rem;
-  background: rgba(0,0,0,0.75);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  gap: 0.9rem;
+  padding: 1rem 1.25rem;
+  background: rgba(0,0,0,0.82);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
-  min-height: 60px;
-  max-height: 120px;
-  animation: captionSlideIn 0.3s var(--spring);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+  min-height: 72px;
+  max-height: 160px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.3s var(--spring);
 }
-.live-caption-bar.visible { display: flex; }
-
-@keyframes captionSlideIn {
-  from { opacity:0; transform:translateY(8px); }
-  to   { opacity:1; transform:translateY(0); }
+.live-caption-bar.visible {
+  display: flex;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 
 .caption-bar-speaker {
@@ -854,25 +864,29 @@ select option { background: #1a1a2e; color: var(--text); }
   min-width: 52px;
 }
 .caption-bar-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 38px; height: 38px; border-radius: 50%;
   background: linear-gradient(135deg, #7c3aed, #6366f1);
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 1rem; color: white; flex-shrink: 0;
 }
 .caption-bar-name {
   font-size: 0.65rem; font-weight: 700; color: #a5b4fc;
-  text-align: center; max-width: 60px;
+  text-align: center; max-width: 64px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
 .caption-bar-text {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  line-height: 1.5;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.45;
   flex: 1;
   align-self: center;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1098,9 +1112,17 @@ select option { background: #1a1a2e; color: var(--text); }
   .ctrl-btn span#participantCount { display: inline; font-size: 0.6rem; }
   .ctrl-btn { min-width: 44px; padding: 0.65rem 0.7rem; }
   #btnShare { display: none; } /* getDisplayMedia unsupported on mobile browsers */
-  .live-caption-bar { padding: 0.6rem 0.875rem; gap: 0.65rem; }
-  .caption-bar-text { font-size: 0.95rem; }
-  .caption-bar-avatar { width: 30px; height: 30px; font-size: 0.85rem; }
+  .live-caption-bar {
+    bottom: 4.8rem;
+    padding: 0.8rem 0.95rem;
+    gap: 0.65rem;
+    width: calc(100vw - 1rem);
+    min-height: 64px;
+    max-height: 140px;
+    border-radius: 14px;
+  }
+  .caption-bar-text { font-size: 1.05rem; }
+  .caption-bar-avatar { width: 32px; height: 32px; font-size: 0.85rem; }
 
   .status-toast { top: auto; bottom: 5.5rem; max-width: calc(100vw - 2rem); white-space: normal; text-align: center; }
   .admit-stack { right: 0.75rem; left: 0.75rem; bottom: 5.75rem; }
@@ -1313,9 +1335,11 @@ html.light .ctrl-btn.off { color: #dc2626; }
 
 /* Live caption bar */
 html.light .live-caption-bar {
-  background: rgba(255,255,255,0.82); border-top-color: rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.92);
+  border-color: rgba(0,0,0,0.10);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.12);
 }
-html.light .caption-bar-text { color: #1c1c1e; }
+html.light .caption-bar-text { color: #111827; }
 html.light .caption-bar-name { color: var(--violet); }
 
 /* Sidebar */
